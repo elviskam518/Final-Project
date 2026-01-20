@@ -624,23 +624,14 @@ def run_comparison_experiment(csv_path="tech_diversity_hiring_data.csv"):
             f"tech_adversarial_grl_{name}_history.csv", index=False, encoding="utf-8-sig"
         )
 
-    print("\nFiles saved:")
-    print("  - tech_adversarial_grl_summary.csv")
-    print("  - tech_adversarial_grl_di_comparison.csv")
-    print("  - tech_adversarial_grl_hr_comparison.csv")
-    print("  - tech_adversarial_grl_*_history.csv")
-
-    print("\n" + "=" * 70)
-    print("Conclusion")
-    print("=" * 70)
 
     if baseline_di_fair > 0:
         di_improvement = (baseline_di_fair - intersect_di_fair) / baseline_di_fair * 100
-        print(f"\n✓ DI fairness improvement: {di_improvement:.1f}%")
+        print(f"\n DI fairness improvement: {di_improvement:.1f}%")
 
     if baseline_hr_std > 0:
         hr_improvement = (baseline_hr_std - intersect_hr_std) / baseline_hr_std * 100
-        print(f"✓ Hiring-rate standard deviation improvement: {hr_improvement:.1f}%")
+        print(f" Hiring-rate standard deviation improvement: {hr_improvement:.1f}%")
 
     acc_drop = (baseline_acc - intersect_acc) * 100
     print(f"Accuracy change: {-acc_drop:+.1f}%")
