@@ -1,305 +1,435 @@
+# b.py
+# Bias Analysis: Fairness Metrics + SHAP Explanation
+# Step 2 of the pipeline: Detect and explain bias in hiring data
+
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.preprocessing import StandardScaler
 import warnings
 warnings.filterwarnings('ignore')
 
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except ImportError:
+    SHAP_AVAILABLE = False
+    print("Warning: SHAP not installed. Run: pip install shap")
 
-def zscore(s: pd.Series) -> pd.Series:
-    s = s.astype(float)
-    std = s.std(ddof=0)
-    if std == 0 or np.isnan(std):
-        return s * 0.0
+
+# ============================================================
+# PART 1: Data Loading & Preparation
+# ============================================================
+
+def load_data(csv_path="tech_diversity_hiring_data.csv"):
+    """Load the hiring dataset"""
+    df = pd.read_csv(csv_path)
+    df["Group"] = df["Gender"] + "_" + df["Race"]
+    
+    print("=" * 70)
+    print("STEP 2: BIAS ANALYSIS")
+    print("=" * 70)
+    print(f"Loaded: {csv_path}")
+    print(f"Samples: {len(df):,}")
+    print(f"Groups: {sorted(df['Group'].unique())}")
+    
+    return df
+
+
+def add_proxy_qualified(df, top_quantile=0.40):
+    """Add proxy qualification label based on skills"""
+    df = df.copy()
+    
+    # Weighted score (emphasize technical skills for tech industry)
+    score = (
+        0.15 * zscore(df["YearsExperience"]) +
+        0.15 * zscore(df["EducationLevel"]) +
+        0.35 * zscore(df["AlgorithmSkill"]) +
+        0.35 * zscore(df["OverallInterviewScore"])
+    )
+    
+    df["QualificationScore"] = score
+    cutoff = score.quantile(1 - top_quantile)
+    df["Qualified"] = (score >= cutoff).astype(int)
+    
+    print(f"\nProxy Qualified: Top {top_quantile:.0%} = {df['Qualified'].sum():,} candidates")
+    
+    return df
+
+
+def zscore(s):
+    """Standardize a series"""
+    std = s.std()
+    if std == 0:
+        return s * 0
     return (s - s.mean()) / std
 
 
-def make_group(df: pd.DataFrame,
-               gender_col="Gender",
-               race_col="Race",
-               group_col="Group") -> pd.DataFrame:
-    df = df.copy()
-    df[group_col] = df[gender_col].astype(str) + "_" + df[race_col].astype(str)
-    return df
+# ============================================================
+# PART 2: Fairness Metrics (DI, EO, Odds Ratio)
+# ============================================================
+
+def compute_fairness_metrics(df, baseline_group="Male_White"):
+    """
+    Compute key fairness metrics:
+    - DI (Disparate Impact): hire_rate / baseline_hire_rate
+    - EO (Equal Opportunity): TPR among qualified candidates
+    - Sample sizes
+    """
+    
+    print("\n" + "=" * 70)
+    print("PART 1: FAIRNESS METRICS")
+    print("=" * 70)
+    
+    results = []
+    
+    for group in df["Group"].unique():
+        mask = df["Group"] == group
+        group_df = df[mask]
+        qualified_df = group_df[group_df["Qualified"] == 1]
+        
+        results.append({
+            "Group": group,
+            "Size": len(group_df),
+            "Hire_Rate": group_df["Hired"].mean(),
+            "Qualified_Count": len(qualified_df),
+            "TPR": qualified_df["Hired"].mean() if len(qualified_df) > 0 else np.nan
+        })
+    
+    results_df = pd.DataFrame(results)
+    
+    # Calculate DI and EO gap vs baseline
+    baseline = results_df[results_df["Group"] == baseline_group].iloc[0]
+    results_df["DI"] = results_df["Hire_Rate"] / baseline["Hire_Rate"]
+    results_df["EO_Gap"] = results_df["TPR"] - baseline["TPR"]
+    
+    # Sort by DI
+    results_df = results_df.sort_values("DI", ascending=True)
+    
+    print(f"\nBaseline group: {baseline_group}")
+    print(f"Baseline hire rate: {baseline['Hire_Rate']:.1%}")
+    print("\n" + results_df.round(4).to_string(index=False))
+    
+    # Flag violations
+    print("\n" + "-" * 50)
+    print("VIOLATIONS:")
+    print("-" * 50)
+    
+    di_violations = results_df[results_df["DI"] < 0.8]
+    eo_violations = results_df[results_df["EO_Gap"].abs() > 0.10]
+    
+    if len(di_violations) > 0:
+        print(f"\n⚠️  DI < 0.8 (potential discrimination):")
+        for _, row in di_violations.iterrows():
+            print(f"   {row['Group']}: DI = {row['DI']:.4f}")
+    
+    if len(eo_violations) > 0:
+        print(f"\n⚠️  |EO Gap| > 10% (unequal opportunity):")
+        for _, row in eo_violations.iterrows():
+            direction = "lower" if row["EO_Gap"] < 0 else "higher"
+            print(f"   {row['Group']}: {abs(row['EO_Gap']):.1%} {direction} than baseline")
+    
+    return results_df
 
 
-COLUMN_MAPPING = {
-    "Gender": "Gender",
-    "Race": "Race",
-    "ExperienceYears": "YearsExperience",
-    "EducationLevel": "EducationLevel",
-    "SkillScore": "AlgorithmSkill",
-    "InterviewScore": "OverallInterviewScore",
-    "Hired": "Hired"
-}
-
-TECH_FEATURE_COLS = {
-    "experience": "YearsExperience",
-    "education": "EducationLevel",
-    "skill": "AlgorithmSkill",
-    "interview": "OverallInterviewScore"
-}
-
-
-def load_tech_data(csv_path="tech_diversity_hiring_data.csv"):
-    df = pd.read_csv(csv_path)
-
-    print("=" * 60)
-    print("Loaded Tech Industry Diversity Hiring Dataset")
-    print("=" * 60)
-    print(f"Number of samples: {len(df):,}")
-    print(f"Columns: {list(df.columns)}")
-
-    return df
-
-
-def add_proxy_qualified_tech(
-    df: pd.DataFrame,
-    experience_col="YearsExperience",
-    education_col="EducationLevel",
-    skill_col="AlgorithmSkill",
-    interview_col="OverallInterviewScore",
-    score_col="QualificationScore",
-    qualified_col="Qualified",
-    top_quantile=0.40,
-    weights=(0.15, 0.15, 0.35, 0.35)
-) -> pd.DataFrame:
-
-    df = df.copy()
-
-    for c in [experience_col, education_col, skill_col, interview_col]:
-        if c not in df.columns:
-            raise ValueError(f"Missing column: {c}")
-
-    w_exp, w_edu, w_skill, w_int = weights
-
-    score = (
-        w_exp * zscore(df[experience_col]) +
-        w_edu * zscore(df[education_col]) +
-        w_skill * zscore(df[skill_col]) +
-        w_int * zscore(df[interview_col])
-    )
-
-    df[score_col] = score
-    cutoff = df[score_col].quantile(1 - top_quantile)
-    df[qualified_col] = (df[score_col] >= cutoff).astype(int)
-
-    print("\nProxy Qualified Setup:")
-    print(f"  Weights: experience={w_exp}, education={w_edu}, skill={w_skill}, interview={w_int}")
-    print(f"  Top {top_quantile*100:.0f}% labeled as qualified")
-    print(f"  Qualified count: {df[qualified_col].sum():,} ({df[qualified_col].mean()*100:.1f}%)")
-
-    return df
-
-
-def compute_proxy_eo_by_group(
-    df: pd.DataFrame,
-    decision_col="Hired",
-    gender_col="Gender",
-    race_col="Race",
-    baseline_gender="Male",
-    baseline_race="White",
-    qualified_col="Qualified",
-    group_col="Group",
-) -> pd.DataFrame:
-
-    df = df.copy()
-
-    for c in [decision_col, gender_col, race_col, qualified_col]:
-        if c not in df.columns:
-            raise ValueError(f"Missing column: {c}")
-
-    df = make_group(df, gender_col, race_col, group_col)
-    baseline_group = f"{baseline_gender}_{baseline_race}"
-
-    grp = df.groupby(group_col)
-
-    out = grp.agg(
-        group_size=(decision_col, "size"),
-        hire_rate=(decision_col, "mean"),
-        qualified_rate=(qualified_col, "mean"),
-    ).reset_index()
-
-    tpr_rows = []
-    for g, gdf in df.groupby(group_col):
-        qdf = gdf[gdf[qualified_col] == 1]
-        tpr = np.nan if len(qdf) == 0 else qdf[decision_col].mean()
-        tpr_rows.append((g, tpr, len(qdf)))
-
-    tpr_df = pd.DataFrame(tpr_rows, columns=[group_col, "TPR_proxy", "qualified_count"])
-    out = out.merge(tpr_df, on=group_col, how="left")
-
-    base_row = out[out[group_col] == baseline_group]
-    if len(base_row) == 0:
-        print(f"Warning: Baseline group '{baseline_group}' not found")
-        return out
-
-    base_hire_rate = float(base_row["hire_rate"].iloc[0])
-    base_tpr = float(base_row["TPR_proxy"].iloc[0])
-
-    out["DI_vs_baseline"] = out["hire_rate"] / base_hire_rate if base_hire_rate > 0 else np.nan
-    out["EO_gap_vs_baseline"] = out["TPR_proxy"] - base_tpr
-
-    out["is_baseline"] = (out[group_col] == baseline_group).astype(int)
-    out = out.sort_values(["is_baseline", group_col], ascending=[False, True])
-    out = out.drop(columns=["is_baseline"])
-
-    return out
-
-
-def run_intersectional_logit_or(
-    df: pd.DataFrame,
-    decision_col="Hired",
-    group_col="Group",
-    baseline_group="Male_White",
-    experience_col="YearsExperience",
-    education_col="EducationLevel",
-    skill_col="AlgorithmSkill",
-    interview_col="OverallInterviewScore",
-    output_csv="tech_logit_oddsratio_by_group.csv"
-) -> pd.DataFrame:
-
-    df = df.copy()
-
-    needed = [decision_col, group_col, experience_col, education_col, skill_col, interview_col]
-    for c in needed:
-        if c not in df.columns:
-            raise ValueError(f"Missing column: {c}")
-
-    feature_cols = [experience_col, education_col, skill_col, interview_col]
-
-    group_dummies = pd.get_dummies(df[group_col], prefix="G", drop_first=False)
+def compute_odds_ratios(df, baseline_group="Male_White"):
+    """
+    Logistic regression to compute odds ratios
+    This controls for qualifications and shows group-level bias
+    """
+    
+    print("\n" + "=" * 70)
+    print("PART 2: ODDS RATIOS (controlling for qualifications)")
+    print("=" * 70)
+    
+    feature_cols = ["YearsExperience", "EducationLevel", "AlgorithmSkill", "OverallInterviewScore"]
+    
+    # Create group dummies
+    group_dummies = pd.get_dummies(df["Group"], prefix="G")
     baseline_col = f"G_{baseline_group}"
     if baseline_col in group_dummies.columns:
         group_dummies = group_dummies.drop(columns=[baseline_col])
-
+    
+    # Prepare data
     scaler = StandardScaler()
-    X_features = scaler.fit_transform(df[feature_cols].values)
+    X_features = scaler.fit_transform(df[feature_cols])
     X = np.hstack([X_features, group_dummies.values])
-    y = df[decision_col].values
-
-    model = LogisticRegression(max_iter=1000, solver="lbfgs")
+    y = df["Hired"].values
+    
+    # Fit model
+    model = LogisticRegression(max_iter=1000)
     model.fit(X, y)
-
+    
+    # Extract odds ratios
     feature_names = feature_cols + list(group_dummies.columns)
-    coefs = model.coef_[0]
-
-    rows = []
+    
+    results = []
     for i, name in enumerate(feature_names):
-        coef = coefs[i]
-        or_val = np.exp(coef)
-
-        if name.startswith("G_"):
-            group_name = name[2:]
-            if or_val > 1:
-                interp = f"Hiring odds {((or_val - 1) * 100):.1f}% higher than {baseline_group}"
-            elif or_val < 1:
-                interp = f"Hiring odds {((1 - or_val) * 100):.1f}% lower than {baseline_group}"
-            else:
-                interp = f"Same as {baseline_group}"
-        else:
-            if or_val > 1:
-                interp = f"Per +1 SD, hiring odds increase {((or_val - 1) * 100):.1f}%"
-            elif or_val < 1:
-                interp = f"Per +1 SD, hiring odds decrease {((1 - or_val) * 100):.1f}%"
-            else:
-                interp = "No effect"
-
-        rows.append({
-            "term": name,
-            "coef": coef,
-            "odds_ratio": or_val,
-            "interpretation": interp
+        coef = model.coef_[0][i]
+        odds_ratio = np.exp(coef)
+        results.append({
+            "Term": name,
+            "Coefficient": coef,
+            "Odds_Ratio": odds_ratio
         })
-
-    rows.append({
-        "term": "Intercept",
-        "coef": model.intercept_[0],
-        "odds_ratio": np.exp(model.intercept_[0]),
-        "interpretation": "Baseline hiring odds"
-    })
-
-    out = pd.DataFrame(rows).sort_values("term").reset_index(drop=True)
-    out.to_csv(output_csv, index=False, encoding="utf-8-sig")
-
-    print("\n" + "=" * 70)
-    print("Intersectional Logistic Regression Results")
-    print("=" * 70)
-    print(f"Baseline group: {baseline_group}")
+    
+    results_df = pd.DataFrame(results).sort_values("Odds_Ratio")
+    
+    print(f"\nBaseline group: {baseline_group}")
     print(f"Model accuracy: {model.score(X, y):.4f}")
-    print(f"Saved to: {output_csv}")
+    print("\nGroup odds ratios (OR < 1 = disadvantaged):")
+    
+    group_results = results_df[results_df["Term"].str.startswith("G_")]
+    print(group_results.round(4).to_string(index=False))
+    
+    # Flag significant disadvantages
+    disadvantaged = group_results[group_results["Odds_Ratio"] < 0.8]
+    if len(disadvantaged) > 0:
+        print("\n⚠️  OR < 0.8 (significant disadvantage after controlling for qualifications):")
+        for _, row in disadvantaged.iterrows():
+            group_name = row["Term"].replace("G_", "")
+            print(f"   {group_name}: OR = {row['Odds_Ratio']:.4f}")
+    
+    return results_df
 
-    group_terms = out[out["term"].str.startswith("G_")]
-    print("\nGroup-level Odds Ratios:")
-    print(group_terms[["term", "coef", "odds_ratio", "interpretation"]].round(4).to_string(index=False))
 
-    return out
+# ============================================================
+# PART 3: SHAP Analysis (Why is each group disadvantaged?)
+# ============================================================
 
-
-def generate_fairness_report(df: pd.DataFrame, eo_results: pd.DataFrame, logit_results: pd.DataFrame):
-
+def run_shap_analysis(df, baseline_group="Male_White"):
+    """
+    SHAP analysis to answer:
+    "For each disadvantaged group, which features cause the bias?"
+    """
+    
+    if not SHAP_AVAILABLE:
+        print("\n⚠️  SHAP not installed. Skipping SHAP analysis.")
+        print("   Install with: pip install shap")
+        return None
+    
     print("\n" + "=" * 70)
-    print("Tech Hiring Fairness Analysis Report")
+    print("PART 3: SHAP ANALYSIS (Why is each group disadvantaged?)")
+    print("=" * 70)
+    
+    feature_cols = [
+        "YearsExperience", "EducationLevel", "AlgorithmSkill",
+        "SystemDesignSkill", "OverallInterviewScore", "GitHubScore",
+        "NumLanguages", "HasReferral", "ResumeScore", "TechInterviewScore",
+        "CultureFitScore"
+    ]
+    feature_cols = [c for c in feature_cols if c in df.columns]
+    
+    print(f"Features: {feature_cols}")
+    
+    # Prepare data
+    X = df[feature_cols].values
+    y = df["Hired"].values
+    groups = df["Group"].values
+    
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    # Train model
+    model = GradientBoostingClassifier(n_estimators=100, max_depth=4, random_state=42)
+    model.fit(X_scaled, y)
+    print(f"Model accuracy: {model.score(X_scaled, y):.4f}")
+    
+    # SHAP values
+    print("\nCalculating SHAP values...")
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_scaled)
+    
+    # Baseline group SHAP
+    baseline_mask = groups == baseline_group
+    baseline_shap = shap_values[baseline_mask].mean(axis=0)
+    
+    # Analyze each group
+    all_results = []
+    
+    print("\n" + "-" * 70)
+    print("WHY IS EACH GROUP DISADVANTAGED?")
+    print("-" * 70)
+    
+    for group in sorted(df["Group"].unique()):
+        if group == baseline_group:
+            continue
+        
+        group_mask = groups == group
+        group_shap = shap_values[group_mask].mean(axis=0)
+        shap_diff = group_shap - baseline_shap
+        
+        # Hiring rate gap
+        group_hire_rate = df[group_mask]["Hired"].mean()
+        baseline_hire_rate = df[baseline_mask]["Hired"].mean()
+        hire_gap = group_hire_rate - baseline_hire_rate
+        
+        print(f"\n{group} (hire rate: {group_hire_rate:.1%}, gap: {hire_gap:+.1%}):")
+        
+        # Find top disadvantages
+        feature_diffs = list(zip(feature_cols, shap_diff))
+        feature_diffs.sort(key=lambda x: x[1])
+        
+        disadvantages = [(f, d) for f, d in feature_diffs if d < -0.01]
+        
+        if disadvantages:
+            print("  Main bias sources:")
+            for feat, diff in disadvantages[:3]:  # Top 3
+                print(f"    • {feat}: {diff:+.4f}")
+        else:
+            print("  No single dominant bias source")
+        
+        # Store results
+        for feat, diff in feature_diffs:
+            all_results.append({
+                "Group": group,
+                "Feature": feat,
+                "SHAP_Diff": diff,
+                "Hire_Gap": hire_gap
+            })
+    
+    results_df = pd.DataFrame(all_results)
+    
+    # Summary: Which features cause the most bias?
+    print("\n" + "-" * 70)
+    print("TOP BIAS-CAUSING FEATURES (averaged across groups):")
+    print("-" * 70)
+    
+    summary = results_df.groupby("Feature")["SHAP_Diff"].agg(["mean", "min"]).round(4)
+    summary.columns = ["Avg_Diff", "Worst_Diff"]
+    summary = summary.sort_values("Avg_Diff")
+    print(summary.to_string())
+    
+    # Save results
+    results_df.to_csv("shap_bias_analysis.csv", index=False)
+    summary.to_csv("shap_feature_summary.csv")
+    
+    return {
+        "results": results_df,
+        "summary": summary,
+        "shap_values": shap_values,
+        "features": feature_cols
+    }
+
+
+def run_counterfactual(df, shap_results, target_group="Female_Black", baseline_group="Male_White"):
+    """
+    Counterfactual analysis:
+    What would need to change for target_group to have same outcomes as baseline?
+    """
+    
+    if shap_results is None:
+        return
+    
+    print("\n" + "=" * 70)
+    print(f"COUNTERFACTUAL: What would {target_group} need to match {baseline_group}?")
+    print("=" * 70)
+    
+    results_df = shap_results["results"]
+    target_results = results_df[results_df["Group"] == target_group].sort_values("SHAP_Diff")
+    
+    target_mask = df["Group"] == target_group
+    baseline_mask = df["Group"] == baseline_group
+    
+    for _, row in target_results.iterrows():
+        if row["SHAP_Diff"] < -0.01:
+            feat = row["Feature"]
+            target_val = df.loc[target_mask, feat].mean()
+            baseline_val = df.loc[baseline_mask, feat].mean()
+            
+            print(f"\n  {feat}:")
+            print(f"    {target_group}: {target_val:.2f}")
+            print(f"    {baseline_group}: {baseline_val:.2f}")
+            print(f"    SHAP gap: {row['SHAP_Diff']:+.4f}")
+            
+            if target_val < baseline_val:
+                pct_needed = ((baseline_val - target_val) / target_val) * 100
+                print(f"    → Would need {pct_needed:.1f}% increase")
+            else:
+                print(f"    → NOT due to lower qualifications!")
+                print(f"    → This is DISCRIMINATION in evaluation")
+
+
+# ============================================================
+# PART 4: Summary Report
+# ============================================================
+
+def generate_summary(fairness_df, odds_df, shap_results):
+    """Generate final summary report"""
+    
+    print("\n" + "=" * 70)
+    print("SUMMARY REPORT")
+    print("=" * 70)
+    
+    # Count violations
+    di_violations = len(fairness_df[fairness_df["DI"] < 0.8])
+    eo_violations = len(fairness_df[fairness_df["EO_Gap"].abs() > 0.10])
+    
+    odds_groups = odds_df[odds_df["Term"].str.startswith("G_")]
+    or_violations = len(odds_groups[odds_groups["Odds_Ratio"] < 0.8])
+    
+    print(f"\n  DI violations (< 0.8):     {di_violations}")
+    print(f"  EO violations (> 10%):     {eo_violations}")
+    print(f"  OR violations (< 0.8):     {or_violations}")
+    print(f"  Total issues:              {di_violations + eo_violations + or_violations}")
+    
+    # Most disadvantaged groups
+    print("\n  Most disadvantaged groups:")
+    worst_groups = fairness_df.nsmallest(3, "DI")
+    for _, row in worst_groups.iterrows():
+        print(f"    • {row['Group']}: DI = {row['DI']:.4f}, Hire Rate = {row['Hire_Rate']:.1%}")
+    
+    # Top bias sources from SHAP
+    if shap_results:
+        print("\n  Top bias-causing features (SHAP):")
+        summary = shap_results["summary"]
+        for feat in summary.index[:3]:
+            val = summary.loc[feat, "Avg_Diff"]
+            print(f"    • {feat}: {val:+.4f}")
+    
+    # Recommendation
+    print("\n" + "-" * 50)
+    if di_violations + eo_violations + or_violations > 0:
+        print("  ⚠️  RECOMMENDATION: Apply bias mitigation")
+        print("     Run: python c.py (Adversarial Debiasing)")
+    else:
+        print("  ✓ No major fairness issues detected")
+    
+    print("\n" + "=" * 70)
+    print("Output files:")
+    print("  • fairness_metrics.csv")
+    print("  • odds_ratios.csv")
+    print("  • shap_bias_analysis.csv")
+    print("  • shap_feature_summary.csv")
     print("=" * 70)
 
-    print("\n1. Disparate Impact Analysis")
-    print("-" * 50)
-    print("DI < 0.8 indicates potential discrimination\n")
 
-    di_issues = eo_results[eo_results["DI_vs_baseline"] < 0.8]
-    if len(di_issues) > 0:
-        for _, row in di_issues.iterrows():
-            print(f"{row['Group']}: DI = {row['DI_vs_baseline']:.4f}")
-    else:
-        print("All groups satisfy DI ≥ 0.8")
-
-    print("\n2. Equal Opportunity Analysis")
-    print("-" * 50)
-
-    eo_issues = eo_results[eo_results["EO_gap_vs_baseline"].abs() > 0.10]
-    if len(eo_issues) > 0:
-        for _, row in eo_issues.iterrows():
-            direction = "lower" if row["EO_gap_vs_baseline"] < 0 else "higher"
-            print(f"{row['Group']}: TPR {direction} than baseline by {abs(row['EO_gap_vs_baseline'])*100:.1f}%")
-
-   
-
-
+# ============================================================
+# MAIN
+# ============================================================
 
 if __name__ == "__main__":
-    df = load_tech_data("tech_diversity_hiring_data.csv")
-
-    df = add_proxy_qualified_tech(
-        df,
-        experience_col="YearsExperience",
-        education_col="EducationLevel",
-        skill_col="AlgorithmSkill",
-        interview_col="OverallInterviewScore"
-    )
-
-    eo_result = compute_proxy_eo_by_group(
-        df,
-        decision_col="Hired",
-        gender_col="Gender",
-        race_col="Race",
-        baseline_gender="Male",
-        baseline_race="White"
-    )
-
-    print("\n" + "=" * 70)
-    print("Proxy EO and DI Results")
-    print("=" * 70)
-    print(eo_result.round(4).to_string(index=False))
-    eo_result.to_csv("tech_proxy_eo_group_metrics.csv", index=False, encoding="utf-8-sig")
-
-    df = make_group(df, "Gender", "Race")
-
-    logit_or = run_intersectional_logit_or(
-        df,
-        decision_col="Hired",
-        group_col="Group"
-    )
-
-    generate_fairness_report(df, eo_result, logit_or)
-
-    print("\nAnalysis completed.")
+    # Load data
+    df = load_data("tech_diversity_hiring_data.csv")
+    df = add_proxy_qualified(df)
+    
+    # Part 1: Fairness metrics
+    fairness_df = compute_fairness_metrics(df)
+    fairness_df.to_csv("fairness_metrics.csv", index=False)
+    
+    # Part 2: Odds ratios
+    odds_df = compute_odds_ratios(df)
+    odds_df.to_csv("odds_ratios.csv", index=False)
+    
+    # Part 3: SHAP analysis
+    shap_results = run_shap_analysis(df)
+    
+    # Part 4: Counterfactual for worst groups
+    if shap_results:
+        for group in ["Female_Black", "Female_Hispanic", "Male_Black"]:
+            if group in df["Group"].values:
+                run_counterfactual(df, shap_results, target_group=group)
+    
+    # Summary
+    generate_summary(fairness_df, odds_df, shap_results)
