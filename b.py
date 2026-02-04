@@ -1,7 +1,3 @@
-# b.py
-# Bias Analysis: Fairness Metrics + SHAP Explanation
-# Step 2 of the pipeline: Detect and explain bias in hiring data
-
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -18,12 +14,8 @@ except ImportError:
     print("Warning: SHAP not installed. Run: pip install shap")
 
 
-# ============================================================
-# PART 1: Data Loading & Preparation
-# ============================================================
 
 def load_data(csv_path="tech_diversity_hiring_data.csv"):
-    """Load the hiring dataset"""
     df = pd.read_csv(csv_path)
     df["Group"] = df["Gender"] + "_" + df["Race"]
     
@@ -38,10 +30,8 @@ def load_data(csv_path="tech_diversity_hiring_data.csv"):
 
 
 def add_proxy_qualified(df, top_quantile=0.40):
-    """Add proxy qualification label based on skills"""
     df = df.copy()
     
-    # Weighted score (emphasize technical skills for tech industry)
     score = (
         0.15 * zscore(df["YearsExperience"]) +
         0.15 * zscore(df["EducationLevel"]) +
@@ -59,24 +49,14 @@ def add_proxy_qualified(df, top_quantile=0.40):
 
 
 def zscore(s):
-    """Standardize a series"""
     std = s.std()
     if std == 0:
         return s * 0
     return (s - s.mean()) / std
 
 
-# ============================================================
-# PART 2: Fairness Metrics (DI, EO, Odds Ratio)
-# ============================================================
-
 def compute_fairness_metrics(df, baseline_group="Male_White"):
-    """
-    Compute key fairness metrics:
-    - DI (Disparate Impact): hire_rate / baseline_hire_rate
-    - EO (Equal Opportunity): TPR among qualified candidates
-    - Sample sizes
-    """
+
     
     print("\n" + "=" * 70)
     print("PART 1: FAIRNESS METRICS")
@@ -99,19 +79,16 @@ def compute_fairness_metrics(df, baseline_group="Male_White"):
     
     results_df = pd.DataFrame(results)
     
-    # Calculate DI and EO gap vs baseline
     baseline = results_df[results_df["Group"] == baseline_group].iloc[0]
     results_df["DI"] = results_df["Hire_Rate"] / baseline["Hire_Rate"]
     results_df["EO_Gap"] = results_df["TPR"] - baseline["TPR"]
     
-    # Sort by DI
     results_df = results_df.sort_values("DI", ascending=True)
     
     print(f"\nBaseline group: {baseline_group}")
     print(f"Baseline hire rate: {baseline['Hire_Rate']:.1%}")
     print("\n" + results_df.round(4).to_string(index=False))
     
-    # Flag violations
     print("\n" + "-" * 50)
     print("VIOLATIONS:")
     print("-" * 50)
@@ -120,12 +97,12 @@ def compute_fairness_metrics(df, baseline_group="Male_White"):
     eo_violations = results_df[results_df["EO_Gap"].abs() > 0.10]
     
     if len(di_violations) > 0:
-        print(f"\n⚠️  DI < 0.8 (potential discrimination):")
+        print(f"\n  DI < 0.8 (potential discrimination):")
         for _, row in di_violations.iterrows():
             print(f"   {row['Group']}: DI = {row['DI']:.4f}")
     
     if len(eo_violations) > 0:
-        print(f"\n⚠️  |EO Gap| > 10% (unequal opportunity):")
+        print(f"\n |EO Gap| > 10% (unequal opportunity):")
         for _, row in eo_violations.iterrows():
             direction = "lower" if row["EO_Gap"] < 0 else "higher"
             print(f"   {row['Group']}: {abs(row['EO_Gap']):.1%} {direction} than baseline")
@@ -134,34 +111,28 @@ def compute_fairness_metrics(df, baseline_group="Male_White"):
 
 
 def compute_odds_ratios(df, baseline_group="Male_White"):
-    """
-    Logistic regression to compute odds ratios
-    This controls for qualifications and shows group-level bias
-    """
-    
+
     print("\n" + "=" * 70)
     print("PART 2: ODDS RATIOS (controlling for qualifications)")
     print("=" * 70)
     
     feature_cols = ["YearsExperience", "EducationLevel", "AlgorithmSkill", "OverallInterviewScore"]
-    
-    # Create group dummies
+
     group_dummies = pd.get_dummies(df["Group"], prefix="G")
     baseline_col = f"G_{baseline_group}"
     if baseline_col in group_dummies.columns:
         group_dummies = group_dummies.drop(columns=[baseline_col])
     
-    # Prepare data
+
     scaler = StandardScaler()
     X_features = scaler.fit_transform(df[feature_cols])
     X = np.hstack([X_features, group_dummies.values])
     y = df["Hired"].values
     
-    # Fit model
+
     model = LogisticRegression(max_iter=1000)
     model.fit(X, y)
     
-    # Extract odds ratios
     feature_names = feature_cols + list(group_dummies.columns)
     
     results = []
@@ -183,10 +154,9 @@ def compute_odds_ratios(df, baseline_group="Male_White"):
     group_results = results_df[results_df["Term"].str.startswith("G_")]
     print(group_results.round(4).to_string(index=False))
     
-    # Flag significant disadvantages
     disadvantaged = group_results[group_results["Odds_Ratio"] < 0.8]
     if len(disadvantaged) > 0:
-        print("\n⚠️  OR < 0.8 (significant disadvantage after controlling for qualifications):")
+        print("\n  OR < 0.8 (significant disadvantage after controlling for qualifications):")
         for _, row in disadvantaged.iterrows():
             group_name = row["Term"].replace("G_", "")
             print(f"   {group_name}: OR = {row['Odds_Ratio']:.4f}")
@@ -194,18 +164,9 @@ def compute_odds_ratios(df, baseline_group="Male_White"):
     return results_df
 
 
-# ============================================================
-# PART 3: SHAP Analysis (Why is each group disadvantaged?)
-# ============================================================
-
 def run_shap_analysis(df, baseline_group="Male_White"):
-    """
-    SHAP analysis to answer:
-    "For each disadvantaged group, which features cause the bias?"
-    """
-    
     if not SHAP_AVAILABLE:
-        print("\n⚠️  SHAP not installed. Skipping SHAP analysis.")
+        print("\n  SHAP not installed. Skipping SHAP analysis.")
         print("   Install with: pip install shap")
         return None
     
@@ -223,7 +184,6 @@ def run_shap_analysis(df, baseline_group="Male_White"):
     
     print(f"Features: {feature_cols}")
     
-    # Prepare data
     X = df[feature_cols].values
     y = df["Hired"].values
     groups = df["Group"].values
@@ -231,21 +191,17 @@ def run_shap_analysis(df, baseline_group="Male_White"):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Train model
     model = GradientBoostingClassifier(n_estimators=100, max_depth=4, random_state=42)
     model.fit(X_scaled, y)
     print(f"Model accuracy: {model.score(X_scaled, y):.4f}")
     
-    # SHAP values
     print("\nCalculating SHAP values...")
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_scaled)
     
-    # Baseline group SHAP
     baseline_mask = groups == baseline_group
     baseline_shap = shap_values[baseline_mask].mean(axis=0)
     
-    # Analyze each group
     all_results = []
     
     print("\n" + "-" * 70)
@@ -260,14 +216,12 @@ def run_shap_analysis(df, baseline_group="Male_White"):
         group_shap = shap_values[group_mask].mean(axis=0)
         shap_diff = group_shap - baseline_shap
         
-        # Hiring rate gap
         group_hire_rate = df[group_mask]["Hired"].mean()
         baseline_hire_rate = df[baseline_mask]["Hired"].mean()
         hire_gap = group_hire_rate - baseline_hire_rate
         
         print(f"\n{group} (hire rate: {group_hire_rate:.1%}, gap: {hire_gap:+.1%}):")
         
-        # Find top disadvantages
         feature_diffs = list(zip(feature_cols, shap_diff))
         feature_diffs.sort(key=lambda x: x[1])
         
@@ -275,12 +229,11 @@ def run_shap_analysis(df, baseline_group="Male_White"):
         
         if disadvantages:
             print("  Main bias sources:")
-            for feat, diff in disadvantages[:3]:  # Top 3
+            for feat, diff in disadvantages[:3]: 
                 print(f"    • {feat}: {diff:+.4f}")
         else:
             print("  No single dominant bias source")
         
-        # Store results
         for feat, diff in feature_diffs:
             all_results.append({
                 "Group": group,
@@ -291,7 +244,6 @@ def run_shap_analysis(df, baseline_group="Male_White"):
     
     results_df = pd.DataFrame(all_results)
     
-    # Summary: Which features cause the most bias?
     print("\n" + "-" * 70)
     print("TOP BIAS-CAUSING FEATURES (averaged across groups):")
     print("-" * 70)
@@ -301,7 +253,6 @@ def run_shap_analysis(df, baseline_group="Male_White"):
     summary = summary.sort_values("Avg_Diff")
     print(summary.to_string())
     
-    # Save results
     results_df.to_csv("shap_bias_analysis.csv", index=False)
     summary.to_csv("shap_feature_summary.csv")
     
@@ -314,10 +265,7 @@ def run_shap_analysis(df, baseline_group="Male_White"):
 
 
 def run_counterfactual(df, shap_results, target_group="Female_Black", baseline_group="Male_White"):
-    """
-    Counterfactual analysis:
-    What would need to change for target_group to have same outcomes as baseline?
-    """
+
     
     if shap_results is None:
         return
@@ -351,18 +299,11 @@ def run_counterfactual(df, shap_results, target_group="Female_Black", baseline_g
                 print(f"    → This is DISCRIMINATION in evaluation")
 
 
-# ============================================================
-# PART 4: Summary Report
-# ============================================================
-
 def generate_summary(fairness_df, odds_df, shap_results):
-    """Generate final summary report"""
     
     print("\n" + "=" * 70)
     print("SUMMARY REPORT")
     print("=" * 70)
-    
-    # Count violations
     di_violations = len(fairness_df[fairness_df["DI"] < 0.8])
     eo_violations = len(fairness_df[fairness_df["EO_Gap"].abs() > 0.10])
     
@@ -374,13 +315,11 @@ def generate_summary(fairness_df, odds_df, shap_results):
     print(f"  OR violations (< 0.8):     {or_violations}")
     print(f"  Total issues:              {di_violations + eo_violations + or_violations}")
     
-    # Most disadvantaged groups
     print("\n  Most disadvantaged groups:")
     worst_groups = fairness_df.nsmallest(3, "DI")
     for _, row in worst_groups.iterrows():
         print(f"    • {row['Group']}: DI = {row['DI']:.4f}, Hire Rate = {row['Hire_Rate']:.1%}")
-    
-    # Top bias sources from SHAP
+
     if shap_results:
         print("\n  Top bias-causing features (SHAP):")
         summary = shap_results["summary"]
@@ -388,7 +327,6 @@ def generate_summary(fairness_df, odds_df, shap_results):
             val = summary.loc[feat, "Avg_Diff"]
             print(f"    • {feat}: {val:+.4f}")
     
-    # Recommendation
     print("\n" + "-" * 50)
     if di_violations + eo_violations + or_violations > 0:
         print("  ⚠️  RECOMMENDATION: Apply bias mitigation")
@@ -405,31 +343,22 @@ def generate_summary(fairness_df, odds_df, shap_results):
     print("=" * 70)
 
 
-# ============================================================
-# MAIN
-# ============================================================
-
 if __name__ == "__main__":
-    # Load data
+
     df = load_data("tech_diversity_hiring_data.csv")
     df = add_proxy_qualified(df)
     
-    # Part 1: Fairness metrics
     fairness_df = compute_fairness_metrics(df)
     fairness_df.to_csv("fairness_metrics.csv", index=False)
     
-    # Part 2: Odds ratios
     odds_df = compute_odds_ratios(df)
     odds_df.to_csv("odds_ratios.csv", index=False)
     
-    # Part 3: SHAP analysis
     shap_results = run_shap_analysis(df)
     
-    # Part 4: Counterfactual for worst groups
     if shap_results:
         for group in ["Female_Black", "Female_Hispanic", "Male_Black"]:
             if group in df["Group"].values:
                 run_counterfactual(df, shap_results, target_group=group)
     
-    # Summary
     generate_summary(fairness_df, odds_df, shap_results)
