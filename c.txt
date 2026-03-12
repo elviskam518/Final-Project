@@ -1,0 +1,205 @@
+PS C:\Users\User\Downloads\Final-Project--main\Final-Project--main> & C:/Users/User/AppData/Local/Microsoft/WindowsApps/python3.11.exe "c:/Users/User/Downloads/Final-Project--main/Final-Project--main/uselss c.py"
+
+======================================================================
+Tech Industry Hiring Fairness Experiment
+Intersectional Adversarial Debiasing with GRL
+======================================================================
+======================================================================
+Loaded Tech Industry Diversity Hiring Dataset
+======================================================================
+Features used: ['YearsExperience', 'EducationLevel', 'AlgorithmSkill', 'SystemDesignSkill', 'OverallInterviewScore', 'GitHubScore', 'NumLanguages', 'HasReferral', 'ResumeScore', 'TechInterviewScore', 'CultureFitScore']
+
+Dataset size:
+  - Train set: 12,000
+  - Test set:  3,000
+  - #Features: 11
+  - #Intersectional groups: 8
+  - Groups: ['Female_Asian', 'Female_Black', 'Female_Hispanic', 'Female_White', 'Male_Asian', 'Male_Black', 'Male_Hispanic', 'Male_White']     
+
+--------------------------------------------------
+
+======================================================================
+Experiment 1: Baseline (No Mitigation)
+======================================================================
+
+Training...
+  Epoch 25/100, Loss: 0.5830
+  Epoch 50/100, Loss: 0.5804
+  Epoch 75/100, Loss: 0.5768
+  Epoch 100/100, Loss: 0.5763
+
+Performance: Acc=0.6890, F1=0.5576
+
+Fairness metrics:
+          Group  Hire_Rate     DI  TPR_proxy  EO_gap
+  Male_Hispanic     0.2440 0.6186     0.5405 -0.1829
+   Female_White     0.2593 0.6574     0.5600 -0.1635
+     Male_White     0.3945 1.0000     0.7235  0.0000
+   Female_Asian     0.2900 0.7352     0.7059 -0.0176
+     Male_Black     0.1922 0.4872     0.4956 -0.2279
+     Male_Asian     0.3588 0.9095     0.7633  0.0398
+Female_Hispanic     0.2088 0.5293     0.5769 -0.1465
+   Female_Black     0.1591 0.4033     0.6786 -0.0449
+
+======================================================================
+Experiment 2: Adversarial Debiasing + GRL (Gender only, 2 classes)
+======================================================================
+
+Training...
+  Epoch   1/200 | α=0.000 | Pred Loss: 0.6248 | Adv Loss: 0.6787 | Val Acc: 0.6897 | Adv Acc: 0.5547 | MajBase: 0.7060 | AdvBal: 0.5910
+  Epoch   2/200 | α=0.000 | Pred Loss: 0.5926 | Adv Loss: 0.6628 | Val Acc: 0.6903 | Adv Acc: 0.6040 | MajBase: 0.7060 | AdvBal: 0.5985
+  Epoch   3/200 | α=0.000 | Pred Loss: 0.5924 | Adv Loss: 0.6594 | Val Acc: 0.6923 | Adv Acc: 0.6000 | MajBase: 0.7060 | AdvBal: 0.6039
+  Epoch   4/200 | α=0.000 | Pred Loss: 0.5904 | Adv Loss: 0.6590 | Val Acc: 0.6933 | Adv Acc: 0.5970 | MajBase: 0.7060 | AdvBal: 0.6100
+  Epoch   5/200 | α=0.000 | Pred Loss: 0.5906 | Adv Loss: 0.6581 | Val Acc: 0.6920 | Adv Acc: 0.5903 | MajBase: 0.7060 | AdvBal: 0.6090
+  Epoch   6/200 | α=0.000 | Pred Loss: 0.5904 | Adv Loss: 0.6578 | Val Acc: 0.6940 | Adv Acc: 0.6000 | MajBase: 0.7060 | AdvBal: 0.6046
+  Epoch   7/200 | α=0.000 | Pred Loss: 0.5894 | Adv Loss: 0.6566 | Val Acc: 0.6923 | Adv Acc: 0.6053 | MajBase: 0.7060 | AdvBal: 0.6064
+  Epoch   8/200 | α=0.000 | Pred Loss: 0.5891 | Adv Loss: 0.6554 | Val Acc: 0.6913 | Adv Acc: 0.6083 | MajBase: 0.7060 | AdvBal: 0.6105
+  Epoch   9/200 | α=0.000 | Pred Loss: 0.5869 | Adv Loss: 0.6563 | Val Acc: 0.6943 | Adv Acc: 0.6050 | MajBase: 0.7060 | AdvBal: 0.6154
+  Epoch  10/200 | α=0.000 | Pred Loss: 0.5873 | Adv Loss: 0.6557 | Val Acc: 0.6940 | Adv Acc: 0.6117 | MajBase: 0.7060 | AdvBal: 0.6102
+  Epoch  11/200 | α=0.000 | Pred Loss: 0.5863 | Adv Loss: 0.6539 | Val Acc: 0.6910 | Adv Acc: 0.5963 | MajBase: 0.7060 | AdvBal: 0.6155
+  Epoch  12/200 | α=0.000 | Pred Loss: 0.5860 | Adv Loss: 0.6529 | Val Acc: 0.6910 | Adv Acc: 0.6007 | MajBase: 0.7060 | AdvBal: 0.6103
+  Epoch  13/200 | α=0.000 | Pred Loss: 0.5873 | Adv Loss: 0.6540 | Val Acc: 0.6920 | Adv Acc: 0.6017 | MajBase: 0.7060 | AdvBal: 0.6163
+  Epoch  14/200 | α=0.000 | Pred Loss: 0.5861 | Adv Loss: 0.6551 | Val Acc: 0.6897 | Adv Acc: 0.6030 | MajBase: 0.7060 | AdvBal: 0.6186
+  Epoch  15/200 | α=0.000 | Pred Loss: 0.5864 | Adv Loss: 0.6538 | Val Acc: 0.6927 | Adv Acc: 0.6143 | MajBase: 0.7060 | AdvBal: 0.6061
+  Epoch  16/200 | α=0.000 | Pred Loss: 0.5882 | Adv Loss: 0.6539 | Val Acc: 0.6923 | Adv Acc: 0.6087 | MajBase: 0.7060 | AdvBal: 0.6110
+  Epoch  17/200 | α=0.000 | Pred Loss: 0.5850 | Adv Loss: 0.6555 | Val Acc: 0.6897 | Adv Acc: 0.6027 | MajBase: 0.7060 | AdvBal: 0.6078
+  Epoch  18/200 | α=0.000 | Pred Loss: 0.5826 | Adv Loss: 0.6540 | Val Acc: 0.6890 | Adv Acc: 0.6033 | MajBase: 0.7060 | AdvBal: 0.6122
+  Epoch  19/200 | α=0.000 | Pred Loss: 0.5851 | Adv Loss: 0.6530 | Val Acc: 0.6930 | Adv Acc: 0.6043 | MajBase: 0.7060 | AdvBal: 0.6123
+  Epoch  20/200 | α=0.000 | Pred Loss: 0.5836 | Adv Loss: 0.6543 | Val Acc: 0.6907 | Adv Acc: 0.6007 | MajBase: 0.7060 | AdvBal: 0.6113
+  Epoch  30/200 | α=0.000 | Pred Loss: 0.5833 | Adv Loss: 0.6539 | Val Acc: 0.6893 | Adv Acc: 0.6113 | MajBase: 0.7060 | AdvBal: 0.6103
+  Epoch  40/200 | α=0.000 | Pred Loss: 0.5818 | Adv Loss: 0.6539 | Val Acc: 0.6900 | Adv Acc: 0.6143 | MajBase: 0.7060 | AdvBal: 0.6061
+  Epoch  50/200 | α=0.000 | Pred Loss: 0.5793 | Adv Loss: 0.6517 | Val Acc: 0.6870 | Adv Acc: 0.6140 | MajBase: 0.7060 | AdvBal: 0.6102
+  Epoch  60/200 | α=0.000 | Pred Loss: 0.5789 | Adv Loss: 0.6548 | Val Acc: 0.6897 | Adv Acc: 0.6013 | MajBase: 0.7060 | AdvBal: 0.6045
+  Epoch  70/200 | α=0.000 | Pred Loss: 0.5755 | Adv Loss: 0.6530 | Val Acc: 0.6880 | Adv Acc: 0.6173 | MajBase: 0.7060 | AdvBal: 0.6132
+  Epoch  80/200 | α=0.000 | Pred Loss: 0.5743 | Adv Loss: 0.6541 | Val Acc: 0.6860 | Adv Acc: 0.6177 | MajBase: 0.7060 | AdvBal: 0.6131
+  Epoch  90/200 | α=0.358 | Pred Loss: 0.5769 | Adv Loss: 0.6851 | Val Acc: 0.6863 | Adv Acc: 0.5000 | MajBase: 0.7060 | AdvBal: 0.5364
+  Epoch 100/200 | α=0.659 | Pred Loss: 0.5780 | Adv Loss: 0.6881 | Val Acc: 0.6863 | Adv Acc: 0.5030 | MajBase: 0.7060 | AdvBal: 0.5448
+  Epoch 110/200 | α=0.836 | Pred Loss: 0.5800 | Adv Loss: 0.6868 | Val Acc: 0.6780 | Adv Acc: 0.5480 | MajBase: 0.7060 | AdvBal: 0.5452
+  Epoch 120/200 | α=0.925 | Pred Loss: 0.5786 | Adv Loss: 0.6881 | Val Acc: 0.6810 | Adv Acc: 0.5317 | MajBase: 0.7060 | AdvBal: 0.5433
+  Epoch 130/200 | α=0.967 | Pred Loss: 0.5785 | Adv Loss: 0.6857 | Val Acc: 0.6797 | Adv Acc: 0.5470 | MajBase: 0.7060 | AdvBal: 0.5432
+  Epoch 140/200 | α=0.985 | Pred Loss: 0.5752 | Adv Loss: 0.6857 | Val Acc: 0.6800 | Adv Acc: 0.5403 | MajBase: 0.7060 | AdvBal: 0.5415
+  Epoch 150/200 | α=0.994 | Pred Loss: 0.5720 | Adv Loss: 0.6887 | Val Acc: 0.6790 | Adv Acc: 0.5290 | MajBase: 0.7060 | AdvBal: 0.5361
+  Epoch 160/200 | α=0.997 | Pred Loss: 0.5756 | Adv Loss: 0.6879 | Val Acc: 0.6753 | Adv Acc: 0.5113 | MajBase: 0.7060 | AdvBal: 0.5295
+  Epoch 170/200 | α=0.999 | Pred Loss: 0.5753 | Adv Loss: 0.6900 | Val Acc: 0.6780 | Adv Acc: 0.5170 | MajBase: 0.7060 | AdvBal: 0.5349
+  Epoch 180/200 | α=0.999 | Pred Loss: 0.5723 | Adv Loss: 0.6878 | Val Acc: 0.6740 | Adv Acc: 0.5157 | MajBase: 0.7060 | AdvBal: 0.5346
+  Epoch 190/200 | α=1.000 | Pred Loss: 0.5698 | Adv Loss: 0.6880 | Val Acc: 0.6757 | Adv Acc: 0.5243 | MajBase: 0.7060 | AdvBal: 0.5460
+  Epoch 200/200 | α=1.000 | Pred Loss: 0.5730 | Adv Loss: 0.6891 | Val Acc: 0.6777 | Adv Acc: 0.5373 | MajBase: 0.7060 | AdvBal: 0.5450
+
+Performance: Acc=0.6777, F1=0.5529
+
+Fairness metrics:
+          Group  Hire_Rate     DI  TPR_proxy  EO_gap
+  Male_Hispanic     0.2727 0.7119     0.6081 -0.1021
+   Female_White     0.3014 0.7868     0.6000 -0.1102
+     Male_White     0.3831 1.0000     0.7102  0.0000
+   Female_Asian     0.3420 0.8927     0.7294  0.0192
+     Male_Black     0.2553 0.6663     0.6195 -0.0907
+     Male_Asian     0.3550 0.9266     0.7585  0.0483
+Female_Hispanic     0.2857 0.7458     0.6923 -0.0179
+   Female_Black     0.1894 0.4944     0.7143  0.0041
+
+======================================================================
+Experiment 3: Intersectional Adversarial Debiasing + GRL (8 groups)
+======================================================================
+
+Training...
+  Epoch   1/200 | α=0.000 | Pred Loss: 0.6189 | Adv Loss: 2.0838 | Val Acc: 0.6873 | Adv Acc: 0.2373 | MajBase: 0.3507 | AdvBal: 0.1675
+  Epoch   2/200 | α=0.000 | Pred Loss: 0.5937 | Adv Loss: 2.0308 | Val Acc: 0.6947 | Adv Acc: 0.2697 | MajBase: 0.3507 | AdvBal: 0.1825
+  Epoch   3/200 | α=0.000 | Pred Loss: 0.5909 | Adv Loss: 2.0113 | Val Acc: 0.6937 | Adv Acc: 0.2717 | MajBase: 0.3507 | AdvBal: 0.1811
+  Epoch   4/200 | α=0.000 | Pred Loss: 0.5902 | Adv Loss: 2.0052 | Val Acc: 0.6900 | Adv Acc: 0.2827 | MajBase: 0.3507 | AdvBal: 0.1876
+  Epoch   5/200 | α=0.000 | Pred Loss: 0.5878 | Adv Loss: 1.9978 | Val Acc: 0.6883 | Adv Acc: 0.2733 | MajBase: 0.3507 | AdvBal: 0.1871
+  Epoch   6/200 | α=0.000 | Pred Loss: 0.5897 | Adv Loss: 2.0000 | Val Acc: 0.6910 | Adv Acc: 0.2770 | MajBase: 0.3507 | AdvBal: 0.1863
+  Epoch   7/200 | α=0.000 | Pred Loss: 0.5883 | Adv Loss: 1.9954 | Val Acc: 0.6910 | Adv Acc: 0.2940 | MajBase: 0.3507 | AdvBal: 0.1926
+  Epoch   8/200 | α=0.000 | Pred Loss: 0.5894 | Adv Loss: 1.9901 | Val Acc: 0.6920 | Adv Acc: 0.2750 | MajBase: 0.3507 | AdvBal: 0.1896
+  Epoch   9/200 | α=0.000 | Pred Loss: 0.5867 | Adv Loss: 1.9907 | Val Acc: 0.6920 | Adv Acc: 0.2863 | MajBase: 0.3507 | AdvBal: 0.1992
+  Epoch  10/200 | α=0.000 | Pred Loss: 0.5856 | Adv Loss: 1.9871 | Val Acc: 0.6913 | Adv Acc: 0.2773 | MajBase: 0.3507 | AdvBal: 0.1995
+  Epoch  11/200 | α=0.000 | Pred Loss: 0.5869 | Adv Loss: 1.9848 | Val Acc: 0.6933 | Adv Acc: 0.2857 | MajBase: 0.3507 | AdvBal: 0.2049
+  Epoch  12/200 | α=0.000 | Pred Loss: 0.5852 | Adv Loss: 1.9863 | Val Acc: 0.6923 | Adv Acc: 0.2867 | MajBase: 0.3507 | AdvBal: 0.1993
+  Epoch  13/200 | α=0.000 | Pred Loss: 0.5866 | Adv Loss: 1.9852 | Val Acc: 0.6913 | Adv Acc: 0.2847 | MajBase: 0.3507 | AdvBal: 0.1970
+  Epoch  14/200 | α=0.000 | Pred Loss: 0.5851 | Adv Loss: 1.9838 | Val Acc: 0.6867 | Adv Acc: 0.2793 | MajBase: 0.3507 | AdvBal: 0.2035
+  Epoch  15/200 | α=0.000 | Pred Loss: 0.5859 | Adv Loss: 1.9799 | Val Acc: 0.6930 | Adv Acc: 0.2783 | MajBase: 0.3507 | AdvBal: 0.2035
+  Epoch  16/200 | α=0.000 | Pred Loss: 0.5837 | Adv Loss: 1.9795 | Val Acc: 0.6943 | Adv Acc: 0.2840 | MajBase: 0.3507 | AdvBal: 0.2025
+  Epoch  17/200 | α=0.000 | Pred Loss: 0.5856 | Adv Loss: 1.9839 | Val Acc: 0.6910 | Adv Acc: 0.2877 | MajBase: 0.3507 | AdvBal: 0.2018
+  Epoch  18/200 | α=0.000 | Pred Loss: 0.5839 | Adv Loss: 1.9838 | Val Acc: 0.6923 | Adv Acc: 0.2797 | MajBase: 0.3507 | AdvBal: 0.2079
+  Epoch  19/200 | α=0.000 | Pred Loss: 0.5853 | Adv Loss: 1.9851 | Val Acc: 0.6897 | Adv Acc: 0.2847 | MajBase: 0.3507 | AdvBal: 0.2091
+  Epoch  20/200 | α=0.000 | Pred Loss: 0.5831 | Adv Loss: 1.9870 | Val Acc: 0.6910 | Adv Acc: 0.2750 | MajBase: 0.3507 | AdvBal: 0.2061
+  Epoch  30/200 | α=0.000 | Pred Loss: 0.5814 | Adv Loss: 1.9811 | Val Acc: 0.6887 | Adv Acc: 0.2857 | MajBase: 0.3507 | AdvBal: 0.2001
+  Epoch  40/200 | α=0.000 | Pred Loss: 0.5797 | Adv Loss: 1.9840 | Val Acc: 0.6917 | Adv Acc: 0.2703 | MajBase: 0.3507 | AdvBal: 0.1967
+  Epoch  50/200 | α=0.000 | Pred Loss: 0.5771 | Adv Loss: 1.9779 | Val Acc: 0.6883 | Adv Acc: 0.2683 | MajBase: 0.3507 | AdvBal: 0.1953
+  Epoch  60/200 | α=0.000 | Pred Loss: 0.5762 | Adv Loss: 1.9773 | Val Acc: 0.6957 | Adv Acc: 0.2673 | MajBase: 0.3507 | AdvBal: 0.1990
+  Epoch  70/200 | α=0.000 | Pred Loss: 0.5745 | Adv Loss: 1.9791 | Val Acc: 0.6877 | Adv Acc: 0.2610 | MajBase: 0.3507 | AdvBal: 0.1968
+  Epoch  80/200 | α=0.000 | Pred Loss: 0.5733 | Adv Loss: 1.9775 | Val Acc: 0.6877 | Adv Acc: 0.2603 | MajBase: 0.3507 | AdvBal: 0.2027
+  Epoch  90/200 | α=0.358 | Pred Loss: 0.5799 | Adv Loss: 2.0675 | Val Acc: 0.6860 | Adv Acc: 0.2007 | MajBase: 0.3507 | AdvBal: 0.1625
+  Epoch 100/200 | α=0.659 | Pred Loss: 0.5865 | Adv Loss: 2.0804 | Val Acc: 0.6810 | Adv Acc: 0.1653 | MajBase: 0.3507 | AdvBal: 0.1364
+  Epoch 110/200 | α=0.836 | Pred Loss: 0.5885 | Adv Loss: 2.0763 | Val Acc: 0.6817 | Adv Acc: 0.1783 | MajBase: 0.3507 | AdvBal: 0.1552
+  Epoch 120/200 | α=0.925 | Pred Loss: 0.5906 | Adv Loss: 2.0690 | Val Acc: 0.6827 | Adv Acc: 0.2033 | MajBase: 0.3507 | AdvBal: 0.1284
+  Epoch 130/200 | α=0.967 | Pred Loss: 0.5867 | Adv Loss: 2.0759 | Val Acc: 0.6857 | Adv Acc: 0.1797 | MajBase: 0.3507 | AdvBal: 0.1418
+  Epoch 140/200 | α=0.985 | Pred Loss: 0.5912 | Adv Loss: 2.0701 | Val Acc: 0.6807 | Adv Acc: 0.1933 | MajBase: 0.3507 | AdvBal: 0.1491
+  Epoch 150/200 | α=0.994 | Pred Loss: 0.5861 | Adv Loss: 2.0782 | Val Acc: 0.6757 | Adv Acc: 0.1520 | MajBase: 0.3507 | AdvBal: 0.1267
+  Epoch 160/200 | α=0.997 | Pred Loss: 0.5875 | Adv Loss: 2.0792 | Val Acc: 0.6827 | Adv Acc: 0.1913 | MajBase: 0.3507 | AdvBal: 0.1343
+  Epoch 170/200 | α=0.999 | Pred Loss: 0.5868 | Adv Loss: 2.0795 | Val Acc: 0.6787 | Adv Acc: 0.1757 | MajBase: 0.3507 | AdvBal: 0.1241
+  Epoch 180/200 | α=0.999 | Pred Loss: 0.5869 | Adv Loss: 2.0705 | Val Acc: 0.6780 | Adv Acc: 0.1933 | MajBase: 0.3507 | AdvBal: 0.1439
+  Epoch 190/200 | α=1.000 | Pred Loss: 0.5876 | Adv Loss: 2.0750 | Val Acc: 0.6817 | Adv Acc: 0.1797 | MajBase: 0.3507 | AdvBal: 0.1419
+  Epoch 200/200 | α=1.000 | Pred Loss: 0.5836 | Adv Loss: 2.0742 | Val Acc: 0.6737 | Adv Acc: 0.1557 | MajBase: 0.3507 | AdvBal: 0.1319
+
+Performance: Acc=0.6737, F1=0.5474
+
+Fairness metrics:
+          Group  Hire_Rate     DI  TPR_proxy  EO_gap
+  Male_Hispanic     0.2679 0.7029     0.6216 -0.0841
+   Female_White     0.2780 0.7294     0.5829 -0.1229
+     Male_White     0.3812 1.0000     0.7058  0.0000
+   Female_Asian     0.3203 0.8404     0.6941 -0.0116
+     Male_Black     0.2823 0.7406     0.6814 -0.0243
+     Male_Asian     0.3645 0.9563     0.7633  0.0575
+Female_Hispanic     0.2967 0.7784     0.6923 -0.0134
+   Female_Black     0.2121 0.5565     0.7857  0.0800
+
+======================================================================
+Results Comparison
+======================================================================
+
+[DI Comparison]:
+          Group  Baseline_DI  Gender_Adv_DI  Intersect_Adv_DI
+  Male_Hispanic       0.6186         0.7119            0.7029
+   Female_White       0.6574         0.7868            0.7294
+     Male_White       1.0000         1.0000            1.0000
+   Female_Asian       0.7352         0.8927            0.8404
+     Male_Black       0.4872         0.6663            0.7406
+     Male_Asian       0.9095         0.9266            0.9563
+Female_Hispanic       0.5293         0.7458            0.7784
+   Female_Black       0.4033         0.4944            0.5565
+
+[Hiring Rate Comparison]:
+          Group  Baseline_HR  Gender_Adv_HR  Intersect_Adv_HR
+  Male_Hispanic       0.2440         0.2727            0.2679
+   Female_White       0.2593         0.3014            0.2780
+     Male_White       0.3945         0.3831            0.3812
+   Female_Asian       0.2900         0.3420            0.3203
+     Male_Black       0.1922         0.2553            0.2823
+     Male_Asian       0.3588         0.3550            0.3645
+Female_Hispanic       0.2088         0.2857            0.2967
+   Female_Black       0.1591         0.1894            0.2121
+
+======================================================================
+Statistical Summary
+======================================================================
+
+[DI Fairness] mean |DI - 1|:
+  Baseline:              0.3324
+  Gender Adversarial:    0.2219
+  Intersect Adversarial: 0.2119
+
+[Minimum DI]:
+  Baseline:              0.4033
+  Gender Adversarial:    0.4944
+  Intersect Adversarial: 0.5565
+
+[Model Performance]:
+  Baseline:              Acc=0.6890, F1=0.5576
+  Gender Adversarial:    Acc=0.6777, F1=0.5529
+  Intersect Adversarial: Acc=0.6737, F1=0.5474
+
+ DI fairness improvement: 36.2%
+ Hiring-rate standard deviation improvement: 33.1%
+Accuracy change: -1.5%

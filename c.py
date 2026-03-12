@@ -136,6 +136,9 @@ def load_and_prepare_data(csv_path="tech_diversity_hiring_data.csv"):
         "GitHubScore",
         "NumLanguages",
         "HasReferral",
+        "ResumeScore",
+        "TechInterviewScore",
+        "CultureFitScore"
     ]
 
     available_cols = [c for c in feature_cols if c in df.columns]
@@ -395,12 +398,11 @@ def train_adversarial_model_grl(
     return history
 
 
-def evaluate_model(model, X_test, df_test, model_type="simple", alpha=1.0):
-    """Evaluate the model."""
+def evaluate_model(model, X_test, df_test, model_type="simple"):
     model.eval()
     with torch.no_grad():
         if model_type == "adversarial":
-            pred, _, _ = model(X_test, alpha=alpha)
+            pred, _, _ = model(X_test, alpha=0)
         else:
             pred = model(X_test)
 
@@ -443,7 +445,7 @@ def run_comparison_experiment(csv_path="tech_diversity_hiring_data.csv"):
 
     baseline_model = SimpleClassifier(input_dim, hidden_dim=64)
     print("\nTraining...")
-    train_baseline_model(baseline_model, data["X_train"], data["y_train"], epochs=100)
+    train_baseline_model(baseline_model, data["X_train"], data["y_train"], epochs=200)
 
     baseline_results, baseline_pred = evaluate_model(
         baseline_model, data["X_test"], data["df_test"], model_type="simple"
@@ -640,4 +642,5 @@ def run_comparison_experiment(csv_path="tech_diversity_hiring_data.csv"):
 
 
 if __name__ == "__main__":
+    
     results, histories = run_comparison_experiment("tech_diversity_hiring_data.csv")
