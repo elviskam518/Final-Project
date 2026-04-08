@@ -118,7 +118,6 @@ def load_and_prepare_data(csv_path="tech_diversity_hiring_data.csv"):
     print("=" * 70)
 
     df["Group"] = df["Gender"] + "_" + df["Race"]
-
     df = add_proxy_qualified(df, top_quantile=0.40)
 
     le_group = LabelEncoder()
@@ -144,16 +143,17 @@ def load_and_prepare_data(csv_path="tech_diversity_hiring_data.csv"):
     available_cols = [c for c in feature_cols if c in df.columns]
     print(f"Features used: {available_cols}")
 
-    X = df[available_cols].values
-    y = df["Hired"].values
-    g_intersect = df["Group_encoded"].values
-    g_gender = df["Gender_encoded"].values
+    X = df[available_cols].values.astype(np.float32)
+    y = df["Hired"].values.astype(np.float32)
+    g_intersect = df["Group_encoded"].values.astype(np.int64)
+    g_gender = df["Gender_encoded"].values.astype(np.int64)
 
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_scaled = scaler.fit_transform(X).astype(np.float32)
 
     indices = np.arange(len(df))
 
+    # First split: train+val vs test
     (
         X_train,
         X_test,
@@ -176,32 +176,64 @@ def load_and_prepare_data(csv_path="tech_diversity_hiring_data.csv"):
         stratify=g_intersect,
     )
 
+    # Second split: train vs val
+    (
+        X_train,
+        X_val,
+        y_train,
+        y_val,
+        g_int_train,
+        g_int_val,
+        g_gen_train,
+        g_gen_val,
+    ) = train_test_split(
+        X_train,
+        y_train,
+        g_int_train,
+        g_gen_train,
+        test_size=0.15,
+        random_state=42,
+        stratify=g_int_train,
+    )
+
     X_train_t = torch.FloatTensor(X_train)
+    X_val_t = torch.FloatTensor(X_val)
     X_test_t = torch.FloatTensor(X_test)
+
     y_train_t = torch.FloatTensor(y_train).unsqueeze(1)
+    y_val_t = torch.FloatTensor(y_val).unsqueeze(1)
     y_test_t = torch.FloatTensor(y_test).unsqueeze(1)
+
     g_int_train_t = torch.LongTensor(g_int_train)
+    g_int_val_t = torch.LongTensor(g_int_val)
     g_int_test_t = torch.LongTensor(g_int_test)
+
     g_gen_train_t = torch.LongTensor(g_gen_train)
+    g_gen_val_t = torch.LongTensor(g_gen_val)
     g_gen_test_t = torch.LongTensor(g_gen_test)
 
     df_test = df.iloc[idx_test].copy().reset_index(drop=True)
 
     print("\nDataset size:")
-    print(f"  - Train set: {len(X_train):,}")
-    print(f"  - Test set:  {len(X_test):,}")
+    print(f"  - Train: {len(X_train):,}")
+    print(f"  - Val:   {len(X_val):,}")
+    print(f"  - Test:  {len(X_test):,}")
     print(f"  - #Features: {X_train.shape[1]}")
     print(f"  - #Intersectional groups: {len(le_group.classes_)}")
     print(f"  - Groups: {list(le_group.classes_)}")
 
     return {
         "X_train": X_train_t,
+        "X_val": X_val_t,
         "X_test": X_test_t,
         "y_train": y_train_t,
+        "y_val": y_val_t,
         "y_test": y_test_t,
         "g_int_train": g_int_train_t,
+        "g_int_val": g_int_val_t,
         "g_int_test": g_int_test_t,
         "g_gen_train": g_gen_train_t,
+        "g_gen_val": g_gen_val_t,
         "g_gen_test": g_gen_test_t,
         "le_group": le_group,
         "le_gender": le_gender,
@@ -210,8 +242,9 @@ def load_and_prepare_data(csv_path="tech_diversity_hiring_data.csv"):
         "df_test": df_test,
         "df_full": df,
         "feature_cols": available_cols,
+        "input_dim": X_train.shape[1],
+        "scaler": scaler,
     }
-
 
 class AdversarialDebiasingGRL(nn.Module):
     def __init__(self, input_dim, hidden_dim=64, num_groups=2):
@@ -252,6 +285,25 @@ class AdversarialDebiasingGRL(nn.Module):
 
 
 class SimpleClassifier(nn.Module):
+    def __init__(self, input_dim, hidden_dim=128):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LeakyReLU(0.2),
+            nn.BatchNorm1d(hidden_dim),
+            nn.Dropout(0.3),
+
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.LeakyReLU(0.2),
+            nn.BatchNorm1d(hidden_dim // 2),
+            nn.Dropout(0.3),
+
+            nn.Linear(hidden_dim // 2, 1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        return self.network(x)
     def __init__(self, input_dim, hidden_dim=64):
         super().__init__()
         self.network = nn.Sequential(
@@ -271,8 +323,8 @@ class SimpleClassifier(nn.Module):
         return self.network(x)
 
 
-def train_baseline_model(model, X_train, y_train, epochs=100, batch_size=256, lr=0.001):
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+def train_baseline_model(model, X_train, y_train, epochs=150, batch_size=256, lr=0.001):
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     criterion = nn.BCELoss()
 
     train_dataset = TensorDataset(X_train, y_train)
@@ -291,7 +343,6 @@ def train_baseline_model(model, X_train, y_train, epochs=100, batch_size=256, lr
 
         if (epoch + 1) % 25 == 0:
             print(f"  Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.4f}")
-
 
 def train_adversarial_model_grl(
     model,
@@ -423,6 +474,8 @@ def evaluate_model(model, X_test, df_test, model_type="simple"):
 
 
 def run_comparison_experiment(csv_path="tech_diversity_hiring_data.csv"):
+    torch.manual_seed(42)
+    np.random.seed(42)
     print("\n" + "=" * 70)
     print("Tech Industry Hiring Fairness Experiment")
     print("Intersectional Adversarial Debiasing with GRL")
@@ -443,9 +496,16 @@ def run_comparison_experiment(csv_path="tech_diversity_hiring_data.csv"):
     print("Experiment 1: Baseline (No Mitigation)")
     print("=" * 70)
 
-    baseline_model = SimpleClassifier(input_dim, hidden_dim=64)
+    baseline_model = SimpleClassifier(input_dim, hidden_dim=128)
     print("\nTraining...")
-    train_baseline_model(baseline_model, data["X_train"], data["y_train"], epochs=200)
+    train_baseline_model(
+        baseline_model,
+        data["X_train"],
+        data["y_train"],
+        epochs=150,
+        batch_size=256,
+        lr=0.001,
+    )
 
     baseline_results, baseline_pred = evaluate_model(
         baseline_model, data["X_test"], data["df_test"], model_type="simple"
@@ -474,16 +534,16 @@ def run_comparison_experiment(csv_path="tech_diversity_hiring_data.csv"):
 
     print("\nTraining...")
     gender_history = train_adversarial_model_grl(
-        gender_adv_model,
-        data["X_train"],
-        data["y_train"],
-        data["g_gen_train"],
-        data["X_test"],
-        data["y_test"],
-        data["g_gen_test"],
-        epochs=200,
-        verbose=True,
-    )
+    gender_adv_model,
+    data["X_train"],
+    data["y_train"],
+    data["g_gen_train"],
+    data["X_val"],
+    data["y_val"],
+    data["g_gen_val"],
+    epochs=200,
+    verbose=True,
+)
 
     gender_results, gender_pred = evaluate_model(
         gender_adv_model, data["X_test"], data["df_test"], model_type="adversarial"
@@ -513,16 +573,16 @@ def run_comparison_experiment(csv_path="tech_diversity_hiring_data.csv"):
 
     print("\nTraining...")
     intersect_history = train_adversarial_model_grl(
-        intersect_adv_model,
-        data["X_train"],
-        data["y_train"],
-        data["g_int_train"],
-        data["X_test"],
-        data["y_test"],
-        data["g_int_test"],
-        epochs=200,
-        verbose=True,
-    )
+    intersect_adv_model,
+    data["X_train"],
+    data["y_train"],
+    data["g_int_train"],
+    data["X_val"],
+    data["y_val"],
+    data["g_int_val"],
+    epochs=200,
+    verbose=True,
+)
 
     intersect_results, intersect_pred = evaluate_model(
         intersect_adv_model, data["X_test"], data["df_test"], model_type="adversarial"

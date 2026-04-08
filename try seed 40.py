@@ -1009,8 +1009,8 @@ def baseline_val_pred_rate(model, data, device="cpu", threshold=0.5):
     return float(y_pred.mean()), y_prob
 
 def run_experiment(csv_path="tech_diversity_hiring_data.csv"):
-    torch.manual_seed(42)
-    np.random.seed(42)
+    torch.manual_seed(40)
+    np.random.seed(40)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = load_and_prepare_data(csv_path)
 
@@ -1084,8 +1084,8 @@ def run_experiment(csv_path="tech_diversity_hiring_data.csv"):
     print("=" * 70)
     all_results = {}
 
-    for mode in ["adv_only", "no_adv", "full"]:
-    #for mode in [ "full"]:   
+    #for mode in ["adv_only", "no_adv", "full"]:
+    for mode in [ "full"]:   
         print("\n" + "="*80)
         print(f"RUN MODE = {mode}")
         print("="*80)
