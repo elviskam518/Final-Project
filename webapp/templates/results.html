@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Results</h2>
+  <p>Real project outputs are loaded from generated CSV/log files already in this repository.</p>
+  <h3>Method Comparison</h3>
+  <table id="method-table"></table>
+  <canvas id="method-chart" height="120"></canvas>
+
+  <h3>Per-group DI Comparison</h3>
+  <table id="di-table"></table>
+  <canvas id="di-chart" height="120"></canvas>
+
+  <h3>Latent-space Analysis</h3>
+  <p id="latent-note"></p>
+  <table id="latent-table"></table>
+</section>
+<script src="/static/results.js"></script>
+{% endblock %}

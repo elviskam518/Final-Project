@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Project Summary</h2>
+  <p>This demo presents an academic pipeline for studying and mitigating bias in hiring decisions. It reuses the existing project code for fairness metrics (<code>b.py</code>) and baseline/adversarial modeling (<code>c.py</code>), while exposing Fair CVAE variants through archived experiment outputs.</p>
+  <ul>
+    <li>Baseline MLP</li>
+    <li>Standalone adversarial baseline (from <code>c.py</code>)</li>
+    <li>Fair CVAE <code>adv_only</code>, <code>no_adv</code>, and <code>full</code></li>
+  </ul>
+  <p>Use <strong>Results</strong> for precomputed research outputs and <strong>Interactive Demo</strong> for upload → analysis → model execution workflow.</p>
+</section>
+{% endblock %}
