@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import uuid
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+import torch
+from sklearn.metrics import accuracy_score, f1_score
+
+from b import add_proxy_qualified, compute_fairness_metrics, compute_odds_ratios
+from c import (
+    AdversarialDebiasingGRL,
+    SimpleClassifier,
+    evaluate_model,
+    load_and_prepare_data,
+    train_adversarial_model_grl,
+    train_baseline_model,
+)
+from .results_loader import load_method_comparison
+
+
+ROOT = Path(__file__).resolve().parents[2]
+UPLOAD_DIR = ROOT / "webapp" / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def save_upload(file_bytes: bytes, filename: str) -> str:
+    upload_id = str(uuid.uuid4())
+    suffix = Path(filename).suffix or ".csv"
+    target = UPLOAD_DIR / f"{upload_id}{suffix}"
+    target.write_bytes(file_bytes)
+    return upload_id
+
+
+def get_upload_path(upload_id: str) -> Path:
+    matches = list(UPLOAD_DIR.glob(f"{upload_id}.*"))
+    if not matches:
+        raise FileNotFoundError(f"Upload id not found: {upload_id}")
+    return matches[0]
+
+
+def run_intermediate_analysis(csv_path: Path, top_quantile: float = 0.40) -> dict[str, Any]:
+    df = pd.read_csv(csv_path)
+    required = {"Gender", "Race", "Hired"}
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+
+    df["Group"] = df["Gender"].astype(str) + "_" + df["Race"].astype(str)
+    df2 = add_proxy_qualified(df, top_quantile=top_quantile)
+
+    baseline_group = "Male_White" if "Male_White" in set(df2["Group"]) else sorted(df2["Group"].unique())[0]
+    fairness_df = compute_fairness_metrics(df2, baseline_group=baseline_group)
+    odds_df = compute_odds_ratios(df2, baseline_group=baseline_group)
+    odds_df = odds_df[odds_df["Term"].astype(str).str.startswith("G_")].copy()
+
+    return {
+        "baseline_group": baseline_group,
+        "row_count": int(len(df2)),
+        "groups": sorted(df2["Group"].unique().tolist()),
+        "fairness": fairness_df.round(4).to_dict(orient="records"),
+        "odds": odds_df.round(4).to_dict(orient="records"),
+    }
+
+
+def run_selected_model(csv_path: Path, model_key: str) -> dict[str, Any]:
+    if model_key in {"baseline_mlp", "standalone_adv"}:
+        return _run_live_torch_model(csv_path, model_key)
+
+    archived = {row["method"]: row for row in load_method_comparison()}
+    cvae_map = {
+        "fair_cvae_adv_only": "Fair CVAE adv_only",
+        "fair_cvae_no_adv": "Fair CVAE no_adv",
+        "fair_cvae_full": "Fair CVAE full",
+    }
+    method_name = cvae_map.get(model_key)
+    if method_name and method_name in archived:
+        row = archived[method_name]
+        return {
+            "mode": "archived",
+            "model": method_name,
+            "accuracy": row.get("accuracy"),
+            "f1": row.get("f1"),
+            "min_di": row.get("min_di"),
+            "note": "This first web release reuses archived Fair CVAE experiment outputs from try.txt instead of running full CVAE training online.",
+        }
+
+    raise ValueError(f"Unsupported model key: {model_key}")
+
+
+def _run_live_torch_model(csv_path: Path, model_key: str) -> dict[str, Any]:
+    np.random.seed(42)
+    torch.manual_seed(42)
+
+    data = load_and_prepare_data(str(csv_path))
+
+    if model_key == "baseline_mlp":
+        model = SimpleClassifier(data["input_dim"], hidden_dim=128)
+        train_baseline_model(
+            model,
+            data["X_train"],
+            data["y_train"],
+            epochs=25,
+            batch_size=256,
+            lr=0.001,
+        )
+        fairness, pred = evaluate_model(model, data["X_test"], data["df_test"], model_type="simple")
+        label = "Baseline MLP"
+    else:
+        model = AdversarialDebiasingGRL(
+            data["input_dim"], hidden_dim=64, num_groups=data["n_groups"]
+        )
+        train_adversarial_model_grl(
+            model,
+            data["X_train"],
+            data["y_train"],
+            data["g_int_train"],
+            data["X_val"],
+            data["y_val"],
+            data["g_int_val"],
+            epochs=30,
+            batch_size=256,
+            lr=0.001,
+            verbose=False,
+        )
+        fairness, pred = evaluate_model(model, data["X_test"], data["df_test"], model_type="adversarial")
+        label = "Standalone adversarial baseline (c.py)"
+
+    acc = float(accuracy_score(data["y_test"].numpy(), pred))
+    f1 = float(f1_score(data["y_test"].numpy(), pred))
+
+    return {
+        "mode": "live",
+        "model": label,
+        "accuracy": round(acc, 4),
+        "f1": round(f1, 4),
+        "min_di": round(float(fairness["DI"].min()), 4),
+        "fairness": fairness.round(4).to_dict(orient="records"),
+        "note": "Live run completed on uploaded data using reused c.py training/evaluation functions with reduced epochs for demo responsiveness.",
+    }
