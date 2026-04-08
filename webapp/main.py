@@ -77,9 +77,15 @@ def create_job(
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    def worker(log):
+    def worker(log, progress):
         log("Job accepted")
-        return run_selected_model(csv_path=csv_path, model_key=model_key, run_latent=run_latent, log=log)
+        return run_selected_model(
+            csv_path=csv_path,
+            model_key=model_key,
+            run_latent=run_latent,
+            log=log,
+            progress=progress,
+        )
 
     job = job_manager.create_job(model_key=model_key, upload_id=upload_id, worker=worker)
     return {"job_id": job.job_id, "status": job.status}
@@ -96,6 +102,8 @@ def get_job_status(job_id: str):
         "job_id": job.job_id,
         "status": job.status,
         "model_key": job.model_key,
+        "progress": job.progress,
+        "progress_text": job.progress_text,
         "error": job.error,
         "updated_at": job.updated_at,
         "log_count": len(job.logs),

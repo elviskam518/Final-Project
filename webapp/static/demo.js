@@ -33,7 +33,8 @@ async function pollJob() {
     return;
   }
 
-  statusEl.innerText = `Job ${currentJobId} | status: ${statusData.status}`;
+  const pct = Math.round((statusData.progress || 0) * 100);
+  statusEl.innerText = `Job ${currentJobId} | status: ${statusData.status} | progress: ${pct}% | ${statusData.progress_text || ''}`;
 
   const logRes = await fetch(`/api/jobs/${currentJobId}/logs?since=${logCursor}`);
   const logData = await logRes.json();

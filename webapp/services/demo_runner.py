@@ -70,11 +70,13 @@ def run_selected_model(
     model_key: str,
     run_latent: bool,
     log: Callable[[str], None] | None = None,
+    progress: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
     log_fn = log or (lambda _: None)
+    progress_fn = progress or (lambda *_: None)
 
     if model_key in {"baseline_mlp", "standalone_adv"}:
-        return _run_live_torch_model(csv_path, model_key, log_fn)
+        return _run_live_torch_model(csv_path, model_key, log_fn, progress_fn)
 
     mode_map = {
         "fair_cvae_adv_only": "adv_only",
@@ -82,19 +84,28 @@ def run_selected_model(
         "fair_cvae_full": "full",
     }
     if model_key in mode_map:
-        return run_fair_cvae_mode(str(csv_path), mode_map[model_key], run_latent=run_latent, log=log_fn)
+        return run_fair_cvae_mode(
+            str(csv_path), mode_map[model_key], run_latent=run_latent, log=log_fn, progress=progress_fn
+        )
 
     raise ValueError(f"Unsupported model key: {model_key}")
 
 
-def _run_live_torch_model(csv_path: Path, model_key: str, log: Callable[[str], None]) -> dict[str, Any]:
+def _run_live_torch_model(
+    csv_path: Path,
+    model_key: str,
+    log: Callable[[str], None],
+    progress: Callable[[float, str], None],
+) -> dict[str, Any]:
     np.random.seed(42)
     torch.manual_seed(42)
 
+    progress(0.05, "Loading dataset")
     log("Loading dataset using c.py")
     data = load_and_prepare_data(str(csv_path))
 
     if model_key == "baseline_mlp":
+        progress(0.2, "Training baseline MLP")
         log("Training baseline MLP (c.py)")
         model = SimpleClassifier(data["input_dim"], hidden_dim=128)
         train_baseline_model(
@@ -108,6 +119,7 @@ def _run_live_torch_model(csv_path: Path, model_key: str, log: Callable[[str], N
         fairness, pred = evaluate_model(model, data["X_test"], data["df_test"], model_type="simple")
         label = "Baseline MLP"
     else:
+        progress(0.2, "Training standalone adversarial baseline")
         log("Training standalone adversarial baseline (c.py)")
         model = AdversarialDebiasingGRL(
             data["input_dim"], hidden_dim=64, num_groups=data["n_groups"]
@@ -128,9 +140,11 @@ def _run_live_torch_model(csv_path: Path, model_key: str, log: Callable[[str], N
         fairness, pred = evaluate_model(model, data["X_test"], data["df_test"], model_type="adversarial")
         label = "Standalone adversarial baseline (c.py)"
 
+    progress(0.9, "Evaluating")
     acc = float(accuracy_score(data["y_test"].numpy(), pred))
     f1 = float(f1_score(data["y_test"].numpy(), pred))
 
+    progress(0.99, "Finalizing")
     log("Model run completed")
     return {
         "mode": "live_background",
