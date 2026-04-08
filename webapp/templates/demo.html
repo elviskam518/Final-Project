@@ -2,7 +2,11 @@
 {% block content %}
 <section class="card">
   <h2>Interactive Demo</h2>
+<<<<<<< HEAD
+  <p>Upload CSV, run intermediate analysis (<code>b.py</code>), then start a long-running real model job (<code>c.py</code> / <code>more strict .py</code>).</p>
+=======
   <p>Upload a hiring CSV, run intermediate fairness analysis, then run a selected model.</p>
+>>>>>>> origin/main
 
   <form id="analyze-form">
     <label>Upload CSV <input type="file" name="file" accept=".csv" required /></label>
@@ -14,6 +18,27 @@
 
   <div id="analysis-output"></div>
 
+<<<<<<< HEAD
+  <form id="job-form" class="hidden">
+    <input type="hidden" name="upload_id" />
+    <label>Choose model/mode
+      <select name="model_key">
+        <option value="baseline_mlp">Baseline MLP</option>
+        <option value="standalone_adv">Standalone adversarial baseline</option>
+        <option value="fair_cvae_adv_only">Fair CVAE adv_only</option>
+        <option value="fair_cvae_no_adv">Fair CVAE no_adv</option>
+        <option value="fair_cvae_full">Fair CVAE full</option>
+      </select>
+    </label>
+    <label><input type="checkbox" name="run_latent" value="true" /> Run latent-space visualisation after training (if applicable)</label>
+    <button type="submit">2) Start Background Job</button>
+  </form>
+
+  <h3>Job Status</h3>
+  <p id="job-status">No job started.</p>
+  <pre id="job-logs"></pre>
+
+=======
   <form id="model-form" class="hidden">
     <input type="hidden" name="upload_id" />
     <label>Choose model
@@ -28,6 +53,7 @@
     <button type="submit">2) Run Selected Model</button>
   </form>
 
+>>>>>>> origin/main
   <div id="model-output"></div>
 </section>
 <script src="/static/demo.js"></script>
