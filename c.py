@@ -304,23 +304,6 @@ class SimpleClassifier(nn.Module):
 
     def forward(self, x):
         return self.network(x)
-    def __init__(self, input_dim, hidden_dim=64):
-        super().__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.BatchNorm1d(hidden_dim),
-            nn.Dropout(0.3),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.BatchNorm1d(hidden_dim),
-            nn.Dropout(0.3),
-            nn.Linear(hidden_dim, 1),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, x):
-        return self.network(x)
 
 
 def train_baseline_model(model, X_train, y_train, epochs=150, batch_size=256, lr=0.001):
