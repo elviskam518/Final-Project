@@ -2,7 +2,7 @@
 {% block content %}
 <section class="card">
   <h2>Interactive Demo</h2>
-  <p>Upload a hiring CSV, run intermediate analysis from <code>b.py</code>, then run a selected live model from <code>c.py</code>.</p>
+  <p>Upload CSV, run intermediate analysis (<code>b.py</code>), then start a long-running real model job (<code>c.py</code> / <code>more strict .py</code>).</p>
 
   <form id="analyze-form">
     <label>Upload CSV <input type="file" name="file" accept=".csv" required /></label>
@@ -14,21 +14,25 @@
 
   <div id="analysis-output"></div>
 
-  <form id="model-form" class="hidden">
+  <form id="job-form" class="hidden">
     <input type="hidden" name="upload_id" />
-    <label>Choose model
+    <label>Choose model/mode
       <select name="model_key">
-        <option value="baseline_mlp">Baseline MLP (live run)</option>
-        <option value="standalone_adv">Standalone adversarial baseline from c.py (live run)</option>
-        <option value="fair_cvae_adv_only">Fair CVAE adv_only (disabled in live demo)</option>
-        <option value="fair_cvae_no_adv">Fair CVAE no_adv (disabled in live demo)</option>
-        <option value="fair_cvae_full">Fair CVAE full (disabled in live demo)</option>
+        <option value="baseline_mlp">Baseline MLP</option>
+        <option value="standalone_adv">Standalone adversarial baseline</option>
+        <option value="fair_cvae_adv_only">Fair CVAE adv_only</option>
+        <option value="fair_cvae_no_adv">Fair CVAE no_adv</option>
+        <option value="fair_cvae_full">Fair CVAE full</option>
       </select>
     </label>
-    <button type="submit">2) Run Selected Model</button>
+    <label><input type="checkbox" name="run_latent" value="true" /> Run latent-space visualisation after training (if applicable)</label>
+    <button type="submit">2) Start Background Job</button>
   </form>
 
-  <p><strong>Note:</strong> Fair CVAE live execution is intentionally disabled in request/response mode. Use offline execution from <code>more strict .py</code> to generate real Fair CVAE outputs.</p>
+  <h3>Job Status</h3>
+  <p id="job-status">No job started.</p>
+  <pre id="job-logs"></pre>
+
   <div id="model-output"></div>
 </section>
 <script src="/static/demo.js"></script>

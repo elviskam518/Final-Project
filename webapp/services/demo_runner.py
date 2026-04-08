@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -18,6 +18,7 @@ from c import (
     train_adversarial_model_grl,
     train_baseline_model,
 )
+from .cvae_runner import run_fair_cvae_mode
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -64,26 +65,37 @@ def run_intermediate_analysis(csv_path: Path, top_quantile: float = 0.40) -> dic
     }
 
 
-def run_selected_model(csv_path: Path, model_key: str) -> dict[str, Any]:
-    if model_key in {"baseline_mlp", "standalone_adv"}:
-        return _run_live_torch_model(csv_path, model_key)
+def run_selected_model(
+    csv_path: Path,
+    model_key: str,
+    run_latent: bool,
+    log: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    log_fn = log or (lambda _: None)
 
-    if model_key in {"fair_cvae_adv_only", "fair_cvae_no_adv", "fair_cvae_full"}:
-        raise RuntimeError(
-            "Fair CVAE live demo is disabled in the web endpoint because the real more strict .py pipeline is computationally expensive "
-            "for interactive request/response. Run the offline pipeline to generate real Fair CVAE outputs."
-        )
+    if model_key in {"baseline_mlp", "standalone_adv"}:
+        return _run_live_torch_model(csv_path, model_key, log_fn)
+
+    mode_map = {
+        "fair_cvae_adv_only": "adv_only",
+        "fair_cvae_no_adv": "no_adv",
+        "fair_cvae_full": "full",
+    }
+    if model_key in mode_map:
+        return run_fair_cvae_mode(str(csv_path), mode_map[model_key], run_latent=run_latent, log=log_fn)
 
     raise ValueError(f"Unsupported model key: {model_key}")
 
 
-def _run_live_torch_model(csv_path: Path, model_key: str) -> dict[str, Any]:
+def _run_live_torch_model(csv_path: Path, model_key: str, log: Callable[[str], None]) -> dict[str, Any]:
     np.random.seed(42)
     torch.manual_seed(42)
 
+    log("Loading dataset using c.py")
     data = load_and_prepare_data(str(csv_path))
 
     if model_key == "baseline_mlp":
+        log("Training baseline MLP (c.py)")
         model = SimpleClassifier(data["input_dim"], hidden_dim=128)
         train_baseline_model(
             model,
@@ -96,6 +108,7 @@ def _run_live_torch_model(csv_path: Path, model_key: str) -> dict[str, Any]:
         fairness, pred = evaluate_model(model, data["X_test"], data["df_test"], model_type="simple")
         label = "Baseline MLP"
     else:
+        log("Training standalone adversarial baseline (c.py)")
         model = AdversarialDebiasingGRL(
             data["input_dim"], hidden_dim=64, num_groups=data["n_groups"]
         )
@@ -110,7 +123,7 @@ def _run_live_torch_model(csv_path: Path, model_key: str) -> dict[str, Any]:
             epochs=30,
             batch_size=256,
             lr=0.001,
-            verbose=False,
+            verbose=True,
         )
         fairness, pred = evaluate_model(model, data["X_test"], data["df_test"], model_type="adversarial")
         label = "Standalone adversarial baseline (c.py)"
@@ -118,12 +131,13 @@ def _run_live_torch_model(csv_path: Path, model_key: str) -> dict[str, Any]:
     acc = float(accuracy_score(data["y_test"].numpy(), pred))
     f1 = float(f1_score(data["y_test"].numpy(), pred))
 
+    log("Model run completed")
     return {
-        "mode": "live",
+        "mode": "live_background",
         "model": label,
         "accuracy": round(acc, 4),
         "f1": round(f1, 4),
         "min_di": round(float(fairness["DI"].min()), 4),
         "fairness": fairness.round(4).to_dict(orient="records"),
-        "note": "Live run completed on uploaded data using reused c.py training/evaluation functions with reduced epochs for demo responsiveness.",
+        "note": "Real execution completed from c.py pipeline.",
     }

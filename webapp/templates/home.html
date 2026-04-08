@@ -2,12 +2,13 @@
 {% block content %}
 <section class="card">
   <h2>Project Summary</h2>
-  <p>This demo uses only real project code paths for execution: fairness diagnostics from <code>b.py</code>, standalone adversarial baseline from <code>c.py</code>, and offline Fair CVAE/latent workflows from <code>more strict .py</code> + <code>latent_vis.py</code>.</p>
+  <p>This demo executes real project pipelines: fairness diagnostics from <code>b.py</code>, baseline/adversarial models from <code>c.py</code>, and Fair CVAE modes from <code>more strict .py</code>. Long-running training is handled via background jobs with status and log streaming in the UI.</p>
   <ul>
-    <li>Live interactive demo: Baseline MLP and standalone adversarial baseline from <code>c.py</code></li>
-    <li>Fair CVAE modes are marked as offline-only unless generated through the real offline pipeline</li>
-    <li><code>a.py</code> is intentionally excluded from end-user workflow</li>
+    <li>Intermediate analysis from <code>b.py</code></li>
+    <li>Baseline MLP and standalone adversarial baseline from <code>c.py</code></li>
+    <li>Fair CVAE <code>adv_only</code>, <code>no_adv</code>, <code>full</code> from <code>more strict .py</code></li>
+    <li>Latent-space outputs from <code>latent_vis.py</code> when requested</li>
   </ul>
-  <p>Use <strong>Results</strong> for generated experiment outputs and <strong>Interactive Demo</strong> for upload → intermediate analysis → live model execution.</p>
+  <p><code>a.py</code> is intentionally excluded from end-user workflow.</p>
 </section>
 {% endblock %}

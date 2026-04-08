@@ -2,24 +2,43 @@
 
 This repository includes a local web application for your final-year project on bias mitigation in hiring.
 
-## Integrity rules implemented
+## Integrity and execution rules
 
-- The web app uses only real project code paths.
+- The web app uses real project scripts as source of truth:
+  - `b.py`
+  - `c.py`
+  - `more strict .py`
+  - `latent_vis.py`
 - `a.py` is excluded from end-user workflow.
-- No `.txt` log parsing is used to simulate model outputs.
-- No fake/archival substitute is used for live demo execution.
-- If a model is too expensive for interactive execution, the UI explicitly marks it as disabled and explains why.
+- No txt-based, archived, placeholder, or fake substitute outputs are used for demo runs.
 
-## Reused project code
+## Architecture for long-running execution
 
-- `b.py`:
-  - intermediate fairness diagnostics (`add_proxy_qualified`, `compute_fairness_metrics`, `compute_odds_ratios`)
-- `c.py`:
-  - live model demo execution for Baseline MLP and standalone adversarial baseline
-- `more strict .py`:
-  - offline Fair CVAE experiment pipeline
-- `latent_vis.py`:
-  - latent-space visual outputs (figures written to `latent_vis/`)
+The app implements a background job flow for real model execution:
+
+1. Upload CSV.
+2. Run intermediate analysis from `b.py`.
+3. Start a model job via API (`/api/jobs`).
+4. Backend executes the real selected pipeline in a background thread.
+5. Frontend polls status/logs and displays incremental execution logs.
+6. Final result is available at `/api/jobs/{job_id}/result` only when completed.
+
+### Job states
+- `queued`
+- `running`
+- `completed`
+- `failed`
+
+## Reused scripts and how they are used
+
+- `b.py`
+  - intermediate fairness diagnostics
+- `c.py`
+  - Baseline MLP and standalone adversarial baseline execution
+- `more strict .py`
+  - Fair CVAE single-mode execution (`adv_only`, `no_adv`, `full`) in job worker
+- `latent_vis.py`
+  - latent visualisation invoked after Fair CVAE training when requested
 
 ## Folder structure
 
@@ -34,11 +53,11 @@ Final-Project/
 ├── requirements.txt
 └── webapp/
     ├── main.py
-    ├── run_offline_pipeline.py
     ├── uploads/
-    ├── offline_results/
     ├── services/
+    │   ├── cvae_runner.py
     │   ├── demo_runner.py
+    │   ├── job_manager.py
     │   └── results_loader.py
     ├── static/
     │   ├── style.css
@@ -52,31 +71,13 @@ Final-Project/
         └── about.html
 ```
 
-## Website behavior
+## Supported selectable modes (one mode per job)
 
-### Pages
-- Home
-- Results
-- Interactive Demo
-- About
-
-### Interactive Demo workflow
-1. Upload CSV.
-2. Run intermediate analysis from `b.py`.
-3. Choose a model.
-4. Run model.
-5. View final outputs.
-
-### Model availability in demo
-- Baseline MLP (`c.py`): **live enabled**
-- Standalone adversarial baseline (`c.py`): **live enabled**
-- Fair CVAE `adv_only` / `no_adv` / `full` (`more strict .py`): **disabled in interactive request/response** with explicit message (computationally expensive)
-
-## Results page data sources
-
-- Method comparison and DI tables from generated outputs (e.g., `c.py` CSV outputs).
-- Fair CVAE results shown only if generated offline via real `more strict .py` pipeline and saved to `webapp/offline_results/fair_cvae_results.json`.
-- Latent-space figures are loaded from `latent_vis/*.png` when present.
+- Baseline MLP
+- Standalone adversarial baseline
+- Fair CVAE `adv_only`
+- Fair CVAE `no_adv`
+- Fair CVAE `full`
 
 ## Setup
 
@@ -84,7 +85,7 @@ Final-Project/
 pip install -r requirements.txt
 ```
 
-## Run web app
+## Run app
 
 ```bash
 uvicorn webapp.main:app --reload
@@ -93,32 +94,31 @@ uvicorn webapp.main:app --reload
 Open:
 - http://127.0.0.1:8000/
 
-## Generate offline Fair CVAE outputs (real code path)
+## API overview
 
-> This is intentionally offline due runtime cost.
-
-```bash
-python webapp/run_offline_pipeline.py
-```
-
-This executes `run_experiment()` from `more strict .py` and writes:
-- `webapp/offline_results/fair_cvae_results.json`
-
-If `more strict .py` runs latent visualization, latent images are written under:
-- `latent_vis/`
+- `POST /api/demo/analyze`
+  - upload CSV and run intermediate diagnostics
+- `POST /api/jobs`
+  - create long-running model job
+- `GET /api/jobs/{job_id}`
+  - job status
+- `GET /api/jobs/{job_id}/logs?since=N`
+  - incremental logs
+- `GET /api/jobs/{job_id}/result`
+  - final output when completed
 
 ## Input CSV requirements
 
 Minimum required columns for intermediate analysis:
 - `Gender`, `Race`, `Hired`
 
-For `c.py` live model paths, include project feature columns when available:
+Model features expected by project pipelines:
 - `YearsExperience`, `EducationLevel`, `AlgorithmSkill`, `SystemDesignSkill`,
 - `OverallInterviewScore`, `GitHubScore`, `NumLanguages`, `HasReferral`,
 - `ResumeScore`, `TechInterviewScore`, `CultureFitScore`
 
-## Known limitations
+## Notes / current limitations
 
-1. Fair CVAE is intentionally disabled in interactive endpoint due heavy runtime from the real `more strict .py` pipeline.
-2. Fair CVAE appears on Results only after running the offline pipeline from real code.
-3. This app does not expose `a.py`.
+- Fair CVAE jobs are computationally expensive and may take significant time.
+- Current job system is in-process memory (job history resets on server restart).
+- If further scaling is needed, migrate to a persistent queue (e.g., Redis/Celery/RQ) while keeping the same APIs.
