@@ -2,7 +2,11 @@
 {% block content %}
 <section class="card">
   <h2>Interactive Demo</h2>
+<<<<<<< HEAD
   <p>Upload CSV, run intermediate analysis (<code>b.py</code>), then start a long-running real model job (<code>c.py</code> / <code>more strict .py</code>).</p>
+=======
+  <p>Upload a hiring CSV, run intermediate fairness analysis, then run a selected model.</p>
+>>>>>>> origin/main
 
   <form id="analyze-form">
     <label>Upload CSV <input type="file" name="file" accept=".csv" required /></label>
@@ -14,6 +18,7 @@
 
   <div id="analysis-output"></div>
 
+<<<<<<< HEAD
   <form id="job-form" class="hidden">
     <input type="hidden" name="upload_id" />
     <label>Choose model/mode
@@ -33,6 +38,22 @@
   <p id="job-status">No job started.</p>
   <pre id="job-logs"></pre>
 
+=======
+  <form id="model-form" class="hidden">
+    <input type="hidden" name="upload_id" />
+    <label>Choose model
+      <select name="model_key">
+        <option value="baseline_mlp">Baseline MLP (live run)</option>
+        <option value="standalone_adv">Standalone adversarial baseline from c.py (live run)</option>
+        <option value="fair_cvae_adv_only">Fair CVAE adv_only (archived result)</option>
+        <option value="fair_cvae_no_adv">Fair CVAE no_adv (archived result)</option>
+        <option value="fair_cvae_full">Fair CVAE full (archived result)</option>
+      </select>
+    </label>
+    <button type="submit">2) Run Selected Model</button>
+  </form>
+
+>>>>>>> origin/main
   <div id="model-output"></div>
 </section>
 <script src="/static/demo.js"></script>

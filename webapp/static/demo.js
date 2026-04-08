@@ -1,12 +1,18 @@
 function toTable(title, rows) {
   if (!rows || rows.length === 0) return `<h4>${title}</h4><p>No rows.</p>`;
   const headers = Object.keys(rows[0]);
+<<<<<<< HEAD
   const thead = `<tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>`;
   const body = rows.map((r) => `<tr>${headers.map((h) => `<td>${r[h] ?? ''}</td>`).join('')}</tr>`).join('');
+=======
+  const thead = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+  const body = rows.map(r => `<tr>${headers.map(h => `<td>${r[h] ?? ''}</td>`).join('')}</tr>`).join('');
+>>>>>>> origin/main
   return `<h4>${title}</h4><table>${thead}${body}</table>`;
 }
 
 const analyzeForm = document.getElementById('analyze-form');
+<<<<<<< HEAD
 const jobForm = document.getElementById('job-form');
 const statusEl = document.getElementById('job-status');
 const logsEl = document.getElementById('job-logs');
@@ -62,12 +68,16 @@ async function pollJob() {
     stopPolling();
   }
 }
+=======
+const modelForm = document.getElementById('model-form');
+>>>>>>> origin/main
 
 analyzeForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(analyzeForm);
   const res = await fetch('/api/demo/analyze', { method: 'POST', body: fd });
   const data = await res.json();
+<<<<<<< HEAD
   if (!res.ok) {
     alert(data.detail || 'Analysis failed');
     return;
@@ -75,6 +85,12 @@ analyzeForm.addEventListener('submit', async (e) => {
 
   jobForm.classList.remove('hidden');
   jobForm.querySelector('input[name="upload_id"]').value = data.upload_id;
+=======
+  if (!res.ok) { alert(data.detail || 'Analysis failed'); return; }
+
+  modelForm.classList.remove('hidden');
+  modelForm.querySelector('input[name="upload_id"]').value = data.upload_id;
+>>>>>>> origin/main
   document.getElementById('analysis-output').innerHTML = `
     <p><strong>Upload id:</strong> ${data.upload_id}</p>
     <p><strong>Rows:</strong> ${data.analysis.row_count} | <strong>Baseline group:</strong> ${data.analysis.baseline_group}</p>
@@ -83,6 +99,7 @@ analyzeForm.addEventListener('submit', async (e) => {
   `;
 });
 
+<<<<<<< HEAD
 jobForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   stopPolling();
@@ -106,4 +123,19 @@ jobForm.addEventListener('submit', async (e) => {
 
   timer = setInterval(pollJob, 2500);
   pollJob();
+=======
+modelForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(modelForm);
+  document.getElementById('model-output').innerHTML = '<p>Running model, please wait...</p>';
+  const res = await fetch('/api/demo/run-model', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (!res.ok) { alert(data.detail || 'Model run failed'); return; }
+
+  document.getElementById('model-output').innerHTML = `
+    <h4>Final Output</h4>
+    <pre>${JSON.stringify(data, null, 2)}</pre>
+    ${data.fairness ? toTable('Final Per-group Fairness Output', data.fairness) : ''}
+  `;
+>>>>>>> origin/main
 });

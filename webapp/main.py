@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .services.demo_runner import get_upload_path, run_intermediate_analysis, run_selected_model, save_upload
+<<<<<<< HEAD
 from .services.job_manager import job_manager
 from .services.results_loader import load_latent_summary, load_method_comparison, load_per_group_di_comparison
 
@@ -18,6 +19,18 @@ app = FastAPI(title="Fairness in Hiring Demo")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 if (ROOT_DIR / "latent_vis").exists():
     app.mount("/latent_vis", StaticFiles(directory=ROOT_DIR / "latent_vis"), name="latent_vis")
+=======
+from .services.results_loader import (
+    load_latent_summary,
+    load_method_comparison,
+    load_per_group_di_comparison,
+)
+
+
+BASE_DIR = Path(__file__).resolve().parent
+app = FastAPI(title="Fairness in Hiring Demo")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+>>>>>>> origin/main
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
@@ -51,7 +64,14 @@ def results_api():
 
 
 @app.post("/api/demo/analyze")
+<<<<<<< HEAD
 async def analyze_upload(file: UploadFile = File(...), top_quantile: float = Form(0.40)):
+=======
+async def analyze_upload(
+    file: UploadFile = File(...),
+    top_quantile: float = Form(0.40),
+):
+>>>>>>> origin/main
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Please upload a CSV file.")
 
@@ -66,6 +86,7 @@ async def analyze_upload(file: UploadFile = File(...), top_quantile: float = For
     return {"upload_id": upload_id, "analysis": analysis}
 
 
+<<<<<<< HEAD
 @app.post("/api/jobs")
 def create_job(
     upload_id: str = Form(...),
@@ -136,3 +157,12 @@ def get_job_result(job_id: str):
     if job.status != "completed":
         raise HTTPException(status_code=409, detail=f"Job status is '{job.status}', result not ready")
     return {"job_id": job.job_id, "result": job.result}
+=======
+@app.post("/api/demo/run-model")
+def run_model(upload_id: str = Form(...), model_key: str = Form(...)):
+    try:
+        result = run_selected_model(get_upload_path(upload_id), model_key)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
+>>>>>>> origin/main
