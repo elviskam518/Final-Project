@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Interactive Demo</h2>
+  <p>Upload a hiring CSV, run intermediate analysis from <code>b.py</code>, then run a selected live model from <code>c.py</code>.</p>
+
+  <form id="analyze-form">
+    <label>Upload CSV <input type="file" name="file" accept=".csv" required /></label>
+    <label>Top quantile for proxy qualification
+      <input type="number" name="top_quantile" value="0.4" min="0.1" max="0.6" step="0.05" />
+    </label>
+    <button type="submit">1) Run Intermediate Analysis</button>
+  </form>
+
+  <div id="analysis-output"></div>
+
+  <form id="model-form" class="hidden">
+    <input type="hidden" name="upload_id" />
+    <label>Choose model
+      <select name="model_key">
+        <option value="baseline_mlp">Baseline MLP (live run)</option>
+        <option value="standalone_adv">Standalone adversarial baseline from c.py (live run)</option>
+        <option value="fair_cvae_adv_only">Fair CVAE adv_only (disabled in live demo)</option>
+        <option value="fair_cvae_no_adv">Fair CVAE no_adv (disabled in live demo)</option>
+        <option value="fair_cvae_full">Fair CVAE full (disabled in live demo)</option>
+      </select>
+    </label>
+    <button type="submit">2) Run Selected Model</button>
+  </form>
+
+  <p><strong>Note:</strong> Fair CVAE live execution is intentionally disabled in request/response mode. Use offline execution from <code>more strict .py</code> to generate real Fair CVAE outputs.</p>
+  <div id="model-output"></div>
+</section>
+<script src="/static/demo.js"></script>
+{% endblock %}

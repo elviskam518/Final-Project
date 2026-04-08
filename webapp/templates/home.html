@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Project Summary</h2>
+  <p>This demo uses only real project code paths for execution: fairness diagnostics from <code>b.py</code>, standalone adversarial baseline from <code>c.py</code>, and offline Fair CVAE/latent workflows from <code>more strict .py</code> + <code>latent_vis.py</code>.</p>
+  <ul>
+    <li>Live interactive demo: Baseline MLP and standalone adversarial baseline from <code>c.py</code></li>
+    <li>Fair CVAE modes are marked as offline-only unless generated through the real offline pipeline</li>
+    <li><code>a.py</code> is intentionally excluded from end-user workflow</li>
+  </ul>
+  <p>Use <strong>Results</strong> for generated experiment outputs and <strong>Interactive Demo</strong> for upload → intermediate analysis → live model execution.</p>
+</section>
+{% endblock %}
